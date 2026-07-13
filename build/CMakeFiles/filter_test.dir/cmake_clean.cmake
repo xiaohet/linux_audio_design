@@ -1,0 +1,14 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/filter_test.dir/link.d"
+  "CMakeFiles/filter_test.dir/src/audio_filter.cpp.o"
+  "CMakeFiles/filter_test.dir/src/audio_filter.cpp.o.d"
+  "CMakeFiles/filter_test.dir/src/filter_test.cpp.o"
+  "CMakeFiles/filter_test.dir/src/filter_test.cpp.o.d"
+  "filter_test"
+  "filter_test.pdb"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/filter_test.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

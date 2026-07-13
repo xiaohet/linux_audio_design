@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/txh20/audio_project/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
