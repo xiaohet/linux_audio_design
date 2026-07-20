@@ -47,7 +47,7 @@ std::string read_string_prompt(const std::string& label, const std::string& defa
 int main(int argc, char* argv[]) {
 	std::string filePath;
 	std::string outFilePath;
-	float gain = 1.0f;
+	float gain = 0.8f;
 	float cutoffHz = 1000.0f;
 
 	try
