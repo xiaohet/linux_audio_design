@@ -1,0 +1,7 @@
+build/
+*.o
+*.out
+*.wav
+.vscode/
+*Zone.Identifier*
+

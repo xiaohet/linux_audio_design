@@ -8,6 +8,7 @@ include_directories(
     include
 )
 
+
 add_executable(
     audio_project
 
@@ -17,9 +18,8 @@ add_executable(
     src/write_wav_file.cpp
 )
 
-add_executable(
-    filter_test
-
-    src/filter_test.cpp
-    src/audio_filter.cpp
+target_compile_definitions(audio_project PRIVATE
+    DEFAULT_PROJECT_DIR="${CMAKE_SOURCE_DIR}"
+    DEFAULT_DATA_DIR="${CMAKE_SOURCE_DIR}/data"
 )
+

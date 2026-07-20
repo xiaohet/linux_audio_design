@@ -1,4 +1,0 @@
-/home/txh20/audio_project/build/CMakeFiles/audio_project.dir
-/home/txh20/audio_project/build/CMakeFiles/filter_test.dir
-/home/txh20/audio_project/build/CMakeFiles/edit_cache.dir
-/home/txh20/audio_project/build/CMakeFiles/rebuild_cache.dir
