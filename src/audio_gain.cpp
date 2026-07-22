@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
 	std::string filePath;
 	std::string outFilePath;
 	float gain = 1.0f;
-	float cutoffHz = 1000.0f;
+	float lowPassCutoffHz = 1000.0f;
 	float highPassCutoffHz = 0.0f;
 
 	try
