@@ -58,4 +58,31 @@ status
 
 The real-time low-pass and high-pass effects are fourth-order Butterworth filters (24 dB/octave), making cutoff changes substantially more audible than the original first-order filters. Use `highpass 0` or `lowpass 0` to disable that filter. Type `help` to display all real-time commands, or `quit` to stop the program. Updates take effect on the next audio period without restarting the ALSA stream.
 
+### Scarlett Solo input routing
+
+The Scarlett Solo exposes its two physical inputs as the two channels of a stereo capture stream. A mono source connected to input 2 therefore appears only on the right channel unless it is routed to both outputs. The default routing is `input2`, which duplicates capture input 2 to the left and right playback channels before applying gain and filters.
+
+Change routing while streaming with:
+
+```text
+route input1
+route input2
+route stereo
+route mix
+```
+
+`stereo` preserves the two capture channels independently. `mix` averages both inputs and sends that mono mix to both outputs. The startup equivalent is `--routing MODE`.
+
+### Diagnosing ALSA recovery
+
+The playback stream is prefilled to several periods before it starts and after an underrun recovery. This makes the configured buffer an actual scheduling reserve rather than starting playback with only one period queued.
+
+Enable rate-limited ALSA diagnostics when investigating a problem:
+
+```bash
+./build/realtime_audio --diagnostics
+```
+
+The startup output shows the period and buffer sizes ALSA actually negotiated; these can differ from the requested values. During streaming, enter `stats` to print capture/playback state, available frames, delay, and recovery counts. Avoid printing on every audio-loop iteration because terminal I/O can itself cause underruns.
+
 The original `audio_project` executable remains available for offline WAV-file processing.
