@@ -1,13 +1,15 @@
-# linux_audio_design
+# Linux Audio Design
 
 This is a Linux-based project aiming for powerful audio applications on Raspberry Pi. 
 
-So far, these functions have been implemented: 
-- an audio wav file reading function;
-- an audio wav file writing function;
+So far, there are two executables in this project: `audio_project` for offline WAV-file processing, and `realtime_audio` for real-time USB audio playback via Raspberry Pi.
+
+In both executables, these functions are implemented and used: 
 - a gain function;
 - a lowpass filter;
 - a highpass filter.
+
+In `audio_project`, an audio wav file reading function and an audio wav file writing function are also used.
 
 ## Raspberry Pi 4 real-time USB audio
 
@@ -85,4 +87,3 @@ Enable rate-limited ALSA diagnostics when investigating a problem:
 
 The startup output shows the period and buffer sizes ALSA actually negotiated; these can differ from the requested values. During streaming, enter `stats` to print capture/playback state, available frames, delay, and recovery counts. Avoid printing on every audio-loop iteration because terminal I/O can itself cause underruns.
 
-The original `audio_project` executable remains available for offline WAV-file processing.
