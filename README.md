@@ -44,4 +44,18 @@ At 48 kHz, a 128-frame period is about 2.7 ms. If ALSA reports overruns or under
 
 Press Ctrl+C to stop. Run `./build/realtime_audio --help` for all options.
 
+While audio is streaming, type commands in the same terminal and press Enter:
+
+```text
+gain 0.6
+gaindb -20
+highpass 80
+lowpass 12000
+status
+```
+
+`gain` is a linear amplitude multiplier: `0.5` is about -6 dB, `0.1` is -20 dB, and `0` is silence. The `gaindb` command is often more intuitive for volume control. Use `mute` as a diagnostic: if audio is still audible after muting, the USB interface's hardware direct-monitor path is enabled and is bypassing this program.
+
+The real-time low-pass and high-pass effects are fourth-order Butterworth filters (24 dB/octave), making cutoff changes substantially more audible than the original first-order filters. Use `highpass 0` or `lowpass 0` to disable that filter. Type `help` to display all real-time commands, or `quit` to stop the program. Updates take effect on the next audio period without restarting the ALSA stream.
+
 The original `audio_project` executable remains available for offline WAV-file processing.
