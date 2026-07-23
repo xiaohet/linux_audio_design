@@ -18,8 +18,8 @@ std::atomic<bool> running{true};
 void stop(int) { running = false; }
 
 struct Options {
-    std::string captureDevice = "plughw:CARD=Device";
-    std::string playbackDevice = "plughw:CARD=Device";
+    std::string captureDevice = "plughw:CARD=USB,DEV=0";
+    std::string playbackDevice = "plughw:CARD=USB,DEV=0";
     unsigned int rate = 48000;
     unsigned int channels = 2;
     snd_pcm_uframes_t periodFrames = 128;
