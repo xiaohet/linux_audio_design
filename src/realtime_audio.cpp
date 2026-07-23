@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <csignal>
 #include <cstdint>
@@ -21,6 +22,32 @@ std::atomic<bool> running{true};
 
 void stop(int) { running = false; }
 
+enum class Routing {
+    Stereo,
+    Input1ToStereo,
+    Input2ToStereo,
+    MixToStereo
+};
+
+const char* routingName(Routing routing) {
+    switch(routing) {
+        case Routing::Stereo: return "stereo";
+        case Routing::Input1ToStereo: return "input1";
+        case Routing::Input2ToStereo: return "input2";
+        case Routing::MixToStereo: return "mix";
+    }
+    return "unknown";
+}
+
+Routing parseRouting(const std::string& value) {
+    if(value == "stereo") return Routing::Stereo;
+    if(value == "input1") return Routing::Input1ToStereo;
+    if(value == "input2") return Routing::Input2ToStereo;
+    if(value == "mix") return Routing::MixToStereo;
+    throw std::runtime_error(
+        "Invalid routing mode; use stereo, input1, input2, or mix");
+}
+
 struct Options {
     std::string captureDevice = "plughw:CARD=USB,DEV=0";
     std::string playbackDevice = "plughw:CARD=USB,DEV=0";
@@ -31,6 +58,8 @@ struct Options {
     float gain = 0.8f;
     float lowPassHz = 0.0f;
     float highPassHz = 0.0f;
+    bool diagnostics = false;
+    Routing routing = Routing::Input2ToStereo;
 };
 
 void usage(const char* name) {
@@ -40,12 +69,14 @@ void usage(const char* name) {
         << "  --playback DEVICE      ALSA playback PCM (default plughw:CARD=Device)\n"
         << "  --rate HZ              Sample rate (default 48000)\n"
         << "  --channels N           Channel count (default 2)\n"
-        << "  --period FRAMES        Frames per processing period (default 128)\n"
-        << "  --buffer FRAMES        ALSA buffer frames (default 512)\n"
+        << "  --period FRAMES        Frames per processing period (default 512)\n"
+        << "  --buffer FRAMES        ALSA buffer frames (default 2048)\n"
         << "  --gain VALUE           Linear gain (default 0.8)\n"
         << "  --gain-db DB           Gain in decibels (overrides --gain)\n"
         << "  --lowpass HZ           Low-pass cutoff; 0 disables (default 0)\n"
         << "  --highpass HZ          High-pass cutoff; 0 disables (default 0)\n"
+        << "  --routing MODE         stereo, input1, input2, or mix (default input2)\n"
+        << "  --diagnostics          Print negotiated ALSA settings and rate-limited xrun details\n"
         << "  --list-devices         Print ALSA PCM device names\n"
         << "  --help                 Show this help\n";
 }
@@ -58,7 +89,9 @@ void controlHelp() {
         << "  mute                    Set gain to zero (useful for checking direct monitoring)\n"
         << "  lowpass HZ             Set cutoff; 0 disables the low-pass filter\n"
         << "  highpass HZ            Set cutoff; 0 disables the high-pass filter\n"
+        << "  route MODE             stereo, input1, input2, or mix\n"
         << "  status                  Show the current parameter values\n"
+        << "  stats                   Show ALSA buffer state and recovery counters\n"
         << "  help                    Show these commands\n"
         << "  quit                    Stop audio and exit\n\n";
 }
@@ -110,6 +143,7 @@ Options parse(int argc, char** argv) {
         const std::string arg = argv[i];
         if(arg == "--help") { usage(argv[0]); std::exit(0); }
         if(arg == "--list-devices") { listDevices(); std::exit(0); }
+        if(arg == "--diagnostics") { options.diagnostics = true; continue; }
         if(i + 1 >= argc) throw std::runtime_error("Missing value for " + arg);
         const char* value = argv[++i];
         if(arg == "--capture") options.captureDevice = value;
@@ -122,6 +156,7 @@ Options parse(int argc, char** argv) {
         else if(arg == "--gain-db") options.gain = std::pow(10.0f, number<float>(value, arg) / 20.0f);
         else if(arg == "--lowpass") options.lowPassHz = number<float>(value, arg);
         else if(arg == "--highpass") options.highPassHz = number<float>(value, arg);
+        else if(arg == "--routing") options.routing = parseRouting(value);
         else throw std::runtime_error("Unknown option: " + arg);
     }
     if(options.bufferFrames < options.periodFrames * 2)
@@ -153,18 +188,73 @@ public:
         snd_pcm_uframes_t buffer = options.bufferFrames;
         check(snd_pcm_hw_params_set_buffer_size_near(handle_, params, &buffer), "set buffer size");
         check(snd_pcm_hw_params(handle_, params), "apply hardware parameters");
+
+        check(snd_pcm_hw_params_get_period_size(params, &periodFrames_, &direction),
+              "read negotiated period size");
+        check(snd_pcm_hw_params_get_buffer_size(params, &bufferFrames_),
+              "read negotiated buffer size");
+
+        snd_pcm_sw_params_t* software;
+        snd_pcm_sw_params_alloca(&software);
+        check(snd_pcm_sw_params_current(handle_, software), "initialize software parameters");
+        check(snd_pcm_sw_params_set_avail_min(handle_, software, periodFrames_),
+              "set minimum available frames");
+        if(stream == SND_PCM_STREAM_PLAYBACK) {
+            // Do not start with only one period queued. Prefilling gives the
+            // capture/process loop real scheduling margin and is reapplied by
+            // snd_pcm_prepare() after an xrun.
+            const snd_pcm_uframes_t threshold =
+                bufferFrames_ > periodFrames_ ? bufferFrames_ - periodFrames_ : periodFrames_;
+            check(snd_pcm_sw_params_set_start_threshold(handle_, software, threshold),
+                  "set playback start threshold");
+        }
+        check(snd_pcm_sw_params(handle_, software), "apply software parameters");
         check(snd_pcm_prepare(handle_), "prepare PCM");
+
+        if(options.diagnostics) {
+            std::cerr << (stream == SND_PCM_STREAM_CAPTURE ? "Capture" : "Playback")
+                      << " ALSA settings: rate=" << rate
+                      << ", channels=" << options.channels
+                      << ", period=" << periodFrames_
+                      << ", buffer=" << bufferFrames_ << '\n';
+        }
     }
 
     ~Pcm() { if(handle_) snd_pcm_close(handle_); }
     snd_pcm_t* get() const { return handle_; }
+    snd_pcm_uframes_t periodFrames() const { return periodFrames_; }
+    snd_pcm_uframes_t bufferFrames() const { return bufferFrames_; }
 
 private:
     void check(int error, const char* operation) {
         if(error < 0) throw std::runtime_error(std::string(operation) + ": " + snd_strerror(error));
     }
     snd_pcm_t* handle_ = nullptr;
+    snd_pcm_uframes_t periodFrames_ = 0;
+    snd_pcm_uframes_t bufferFrames_ = 0;
 };
+
+struct RecoveryStats {
+    unsigned long capture = 0;
+    unsigned long playback = 0;
+    std::chrono::steady_clock::time_point lastDiagnostic{};
+};
+
+void printPcmStatus(const char* name, const Pcm& pcm) {
+    snd_pcm_status_t* status;
+    snd_pcm_status_alloca(&status);
+    const int result = snd_pcm_status(pcm.get(), status);
+    if(result < 0) {
+        std::cerr << name << " status unavailable: " << snd_strerror(result) << '\n';
+        return;
+    }
+    std::cerr << name
+              << " state=" << snd_pcm_state_name(snd_pcm_status_get_state(status))
+              << ", available=" << snd_pcm_status_get_avail(status)
+              << ", delay=" << snd_pcm_status_get_delay(status)
+              << ", period=" << pcm.periodFrames()
+              << ", buffer=" << pcm.bufferFrames() << '\n';
+}
 
 class Biquad {
 public:
@@ -198,6 +288,12 @@ public:
         const float output = b0_ * input + z1_[channel];
         z1_[channel] = b1_ * input - a1_ * output + z2_[channel];
         z2_[channel] = b2_ * input - a2_ * output;
+        if(!std::isfinite(output) || !std::isfinite(z1_[channel]) ||
+           !std::isfinite(z2_[channel])) {
+            z1_[channel] = 0.0f;
+            z2_[channel] = 0.0f;
+            return 0.0f;
+        }
         return output;
     }
 
@@ -216,13 +312,14 @@ class Processor {
 public:
     explicit Processor(const Options& o)
         : rate_(o.rate), channels_(o.channels), gain_(o.gain),
-          lowPassHz_(o.lowPassHz), highPassHz_(o.highPassHz),
+          lowPassHz_(o.lowPassHz), highPassHz_(o.highPassHz), routing_(o.routing),
           lowPass_{Biquad(o.channels), Biquad(o.channels)},
           highPass_{Biquad(o.channels), Biquad(o.channels)} {
         updateFilters();
     }
 
     void process(std::vector<int16_t>& samples, snd_pcm_sframes_t frames) {
+        applyRouting(samples, frames);
         const size_t count = static_cast<size_t>(frames) * channels_;
         for(size_t i = 0; i < count; ++i) {
             const size_t channel = i % channels_;
@@ -241,6 +338,7 @@ public:
 
     void setGain(float value) { gain_ = value; }
     void setGainDb(float value) { gain_ = std::pow(10.0f, value / 20.0f); }
+    void setRouting(Routing value) { routing_ = value; }
 
     void setLowPass(float value) {
         lowPassHz_ = value;
@@ -260,10 +358,31 @@ public:
                   << (highPassHz_ > 0 ? std::to_string(highPassHz_) + " Hz" : "off")
                   << " | Low-pass: "
                   << (lowPassHz_ > 0 ? std::to_string(lowPassHz_) + " Hz" : "off")
+                  << " | Routing: " << routingName(routing_)
                   << '\n';
     }
 
 private:
+    void applyRouting(std::vector<int16_t>& samples, snd_pcm_sframes_t frames) const {
+        if(channels_ != 2 || routing_ == Routing::Stereo) return;
+
+        for(snd_pcm_sframes_t frame = 0; frame < frames; ++frame) {
+            const size_t offset = static_cast<size_t>(frame) * 2;
+            int16_t mono = 0;
+            if(routing_ == Routing::Input1ToStereo) {
+                mono = samples[offset];
+            } else if(routing_ == Routing::Input2ToStereo) {
+                mono = samples[offset + 1];
+            } else {
+                const int mixed = static_cast<int>(samples[offset]) +
+                                  static_cast<int>(samples[offset + 1]);
+                mono = static_cast<int16_t>(mixed / 2);
+            }
+            samples[offset] = mono;
+            samples[offset + 1] = mono;
+        }
+    }
+
     void updateFilters() {
         // Q values for the two sections of a fourth-order Butterworth filter.
         constexpr std::array<float, 2> butterworthQ{0.5411961f, 1.3065630f};
@@ -284,11 +403,14 @@ private:
     float gain_;
     float lowPassHz_;
     float highPassHz_;
+    Routing routing_;
     std::array<Biquad, 2> lowPass_;
     std::array<Biquad, 2> highPass_;
 };
 
-void handleControlInput(Processor& processor, unsigned int sampleRate) {
+void handleControlInput(Processor& processor, unsigned int sampleRate,
+                        const Pcm& capture, const Pcm& playback,
+                        const RecoveryStats& recoveries) {
     pollfd input{STDIN_FILENO, POLLIN, 0};
     if(poll(&input, 1, 0) <= 0 || !(input.revents & POLLIN)) return;
 
@@ -309,6 +431,28 @@ void handleControlInput(Processor& processor, unsigned int sampleRate) {
     }
     if(command == "status") {
         processor.printStatus();
+        return;
+    }
+    if(command == "stats") {
+        std::cerr << "Recoveries: capture=" << recoveries.capture
+                  << ", playback=" << recoveries.playback << '\n';
+        printPcmStatus("Capture", capture);
+        printPcmStatus("Playback", playback);
+        return;
+    }
+    if(command == "route") {
+        std::string value;
+        std::string extra;
+        if(!(commandLine >> value) || (commandLine >> extra)) {
+            std::cerr << "Expected: route stereo|input1|input2|mix\n";
+            return;
+        }
+        try {
+            processor.setRouting(parseRouting(value));
+            processor.printStatus();
+        } catch(const std::exception& error) {
+            std::cerr << error.what() << '\n';
+        }
         return;
     }
     if(command == "mute") {
@@ -357,12 +501,23 @@ void handleControlInput(Processor& processor, unsigned int sampleRate) {
     processor.printStatus();
 }
 
-snd_pcm_sframes_t recover(snd_pcm_t* pcm, snd_pcm_sframes_t error, const char* direction) {
+void recover(Pcm& pcm, snd_pcm_sframes_t error, const char* direction,
+             unsigned long& counter, RecoveryStats& stats, bool diagnostics) {
     if(error == -EPIPE || error == -ESTRPIPE || error == -EINTR) {
-        const int result = snd_pcm_recover(pcm, static_cast<int>(error), 1);
+        ++counter;
+        const auto now = std::chrono::steady_clock::now();
+        if(diagnostics &&
+           (stats.lastDiagnostic.time_since_epoch().count() == 0 ||
+            now - stats.lastDiagnostic >= std::chrono::seconds(2))) {
+            std::cerr << direction << " I/O error: " << snd_strerror(static_cast<int>(error))
+                      << " (recovery #" << counter << ")\n";
+            printPcmStatus(direction, pcm);
+            stats.lastDiagnostic = now;
+        }
+
+        const int result = snd_pcm_recover(pcm.get(), static_cast<int>(error), 1);
         if(result < 0) throw std::runtime_error(std::string(direction) + " recovery failed: " + snd_strerror(result));
-        std::cerr << direction << " stream recovered from an over/underrun\n";
-        return 0;
+        return;
     }
     throw std::runtime_error(std::string(direction) + " failed: " + snd_strerror(static_cast<int>(error)));
 }
@@ -378,6 +533,7 @@ int main(int argc, char** argv) {
         Pcm playback(options.playbackDevice, SND_PCM_STREAM_PLAYBACK, options);
         Processor processor(options);
         std::vector<int16_t> samples(options.periodFrames * options.channels);
+        RecoveryStats recoveries;
 
         std::cout << "Streaming " << options.rate << " Hz, " << options.channels
                   << " channels. Press Ctrl+C to stop.\n";
@@ -385,15 +541,28 @@ int main(int argc, char** argv) {
         processor.printStatus();
         while(running) {
             snd_pcm_sframes_t frames = snd_pcm_readi(capture.get(), samples.data(), options.periodFrames);
-            if(frames < 0) { recover(capture.get(), frames, "Capture"); continue; }
+            if(frames < 0) {
+                if(!running && frames == -EINTR) break;
+                recover(capture, frames, "Capture", recoveries.capture,
+                        recoveries, options.diagnostics);
+                continue;
+            }
             processor.process(samples, frames);
             snd_pcm_sframes_t written = 0;
             while(written < frames && running) {
                 const auto result = snd_pcm_writei(playback.get(), samples.data() + written * options.channels, frames - written);
-                if(result < 0) { recover(playback.get(), result, "Playback"); break; }
+                if(result < 0) {
+                    if(!running && result == -EINTR) break;
+                    recover(playback, result, "Playback", recoveries.playback,
+                            recoveries, options.diagnostics);
+                    break;
+                }
+                if(result == 0) {
+                    throw std::runtime_error("Playback made no progress");
+                }
                 written += result;
             }
-            handleControlInput(processor, options.rate);
+            handleControlInput(processor, options.rate, capture, playback, recoveries);
         }
         snd_pcm_drop(capture.get());
         snd_pcm_drain(playback.get());
