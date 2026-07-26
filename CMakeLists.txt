@@ -26,12 +26,13 @@ target_compile_definitions(audio_project PRIVATE
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(PkgConfig REQUIRED)
+    find_package(Threads REQUIRED)
     pkg_check_modules(ALSA REQUIRED IMPORTED_TARGET alsa)
 
     add_executable(realtime_audio
         src/realtime_audio.cpp
     )
-    target_link_libraries(realtime_audio PRIVATE PkgConfig::ALSA)
+    target_link_libraries(realtime_audio PRIVATE PkgConfig::ALSA Threads::Threads)
     target_compile_options(realtime_audio PRIVATE -Wall -Wextra -Wpedantic)
 else()
     message(STATUS "realtime_audio is only built on Linux (ALSA required)")
