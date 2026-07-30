@@ -31,6 +31,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     add_executable(realtime_audio
         src/realtime_audio.cpp
+        src/audio_config.cpp
+        src/command_interface.cpp
+        src/pcm_device.cpp
+        src/realtime_processor.cpp
+        src/web_control_server.cpp
     )
     target_link_libraries(realtime_audio PRIVATE PkgConfig::ALSA Threads::Threads)
     target_compile_options(realtime_audio PRIVATE -Wall -Wextra -Wpedantic)
