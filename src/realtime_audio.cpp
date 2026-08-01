@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
         Pcm capture(options.captureDevice, SND_PCM_STREAM_CAPTURE, options);
         Pcm playback(options.playbackDevice, SND_PCM_STREAM_PLAYBACK, options);
         Processor processor(options);
-        WebControlServer webControls(options.webPort, options.rate, processor);
+        WebControlServer webControls(options.webPort, processor);
         std::vector<int16_t> samples(options.periodFrames * options.channels);
         RecoveryStats recoveries;
 
@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
                 written += result;
             }
 
-            if(!handle_control_input(processor, options.rate, capture, playback,
+            if(!handle_control_input(processor, capture, playback,
                                      recoveries)) {
                 running = false;
             }

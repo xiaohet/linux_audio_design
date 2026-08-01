@@ -38,8 +38,8 @@ void print_usage(const char* name) {
         << "  --buffer FRAMES        ALSA buffer frames (default 2048)\n"
         << "  --gain VALUE           Linear gain (default 0.8)\n"
         << "  --gain-db DB           Gain in decibels (overrides --gain)\n"
-        << "  --lowpass HZ           Low-pass cutoff; 0 disables (default 0)\n"
-        << "  --highpass HZ          High-pass cutoff; 0 disables (default 0)\n"
+        << "  Seven-band EQ frequencies are fixed at 80, 160, 320, 640,\n"
+        << "  1280, 2560, and 5120 Hz; gains default to 0 dB.\n"
         << "  --gate-db DB           Noise-gate threshold (default -55; -120 disables)\n"
         << "  --routing MODE         stereo, input1, input2, or mix (default input2)\n"
         << "  --web-port PORT        Browser control port (default 8080; 0 disables)\n"
@@ -128,8 +128,6 @@ Options parse_options(int argc, char** argv) {
         else if(argument == "--gain") options.gain = number<float>(value, argument);
         else if(argument == "--gain-db")
             options.gain = std::pow(10.0f, number<float>(value, argument) / 20.0f);
-        else if(argument == "--lowpass") options.lowPassHz = number<float>(value, argument);
-        else if(argument == "--highpass") options.highPassHz = number<float>(value, argument);
         else if(argument == "--gate-db") options.noiseGateDb = number<float>(value, argument);
         else if(argument == "--routing") options.routing = parse_routing(value);
         else if(argument == "--web-port") {
@@ -149,8 +147,6 @@ Options parse_options(int argc, char** argv) {
 
     if(options.bufferFrames < options.periodFrames * 2)
         throw std::runtime_error("--buffer must be at least twice --period");
-    if(options.lowPassHz < 0 || options.highPassHz < 0)
-        throw std::runtime_error("Filter cutoffs cannot be negative");
     if(options.noiseGateDb < -120.0f || options.noiseGateDb > -10.0f)
         throw std::runtime_error("--gate-db must be between -120 and -10 dBFS");
     return options;

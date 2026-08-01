@@ -11,10 +11,8 @@
 
 class Biquad {
 public:
-    enum class Type { LowPass, HighPass };
-
     explicit Biquad(unsigned int channels);
-    void configure(Type type, float cutoffHz, float sampleRate, float q);
+    void configure_peaking(float frequencyHz, float gainDb, float sampleRate, float q);
     float process(float input, size_t channel);
 
 private:
@@ -31,16 +29,20 @@ private:
 
 class Processor {
 public:
+    static constexpr size_t EqBandCount = 7;
+    static constexpr std::array<float, EqBandCount> EqFrequencies{
+        80.0f, 160.0f, 320.0f, 640.0f, 1280.0f, 2560.0f, 5120.0f};
+    static constexpr float EqQ = 1.4f;
+
     struct Snapshot {
         float gain;
-        float lowPassHz;
-        float highPassHz;
+        std::array<float, EqBandCount> eqGainsDb;
         float peak;
         float input1Peak;
         float input2Peak;
         float noiseGateDb;
         bool gateOpen;
-        bool bypass;
+        float dryWet;
         Routing routing;
     };
 
@@ -50,32 +52,30 @@ public:
     void set_gain(float value);
     void set_gain_db(float value);
     void set_routing(Routing value);
-    void set_bypass(bool value);
+    void set_dry_wet(float value);
     void set_noise_gate_db(float value);
-    void set_low_pass(float value);
-    void set_high_pass(float value);
+    void set_eq_gain_db(size_t band, float value);
+    void reset_eq();
     void print_status() const;
     void print_signal_levels() const;
     Snapshot snapshot() const;
 
 private:
     void apply_routing(std::vector<int16_t>& samples, snd_pcm_sframes_t frames) const;
-    void update_filters();
+    void update_eq();
 
     unsigned int rate_;
     unsigned int channels_;
     float gain_;
-    float lowPassHz_;
-    float highPassHz_;
+    std::array<float, EqBandCount> eqGainsDb_;
     float peak_ = 0.0f;
     float input1Peak_ = 0.0f;
     float input2Peak_ = 0.0f;
     float noiseGateDb_;
     float gateGain_ = 0.0f;
     bool gateOpen_ = false;
-    bool bypass_ = false;
+    float dryWet_ = 1.0f;
     Routing routing_;
-    std::array<Biquad, 2> lowPass_;
-    std::array<Biquad, 2> highPass_;
+    std::array<Biquad, EqBandCount> equalizers_;
     mutable std::mutex mutex_;
 };
