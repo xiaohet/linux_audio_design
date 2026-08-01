@@ -9,7 +9,7 @@
 
 class WebControlServer {
 public:
-    WebControlServer(unsigned int port, unsigned int sampleRate, Processor& processor);
+    WebControlServer(unsigned int port, Processor& processor);
     ~WebControlServer();
 
     WebControlServer(const WebControlServer&) = delete;
@@ -27,7 +27,6 @@ private:
     void serve();
 
     unsigned int port_;
-    unsigned int sampleRate_;
     Processor& processor_;
     int listener_ = -1;
     std::atomic<bool> stop_{false};

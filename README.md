@@ -4,10 +4,9 @@ This is a Linux-based project aiming for powerful audio applications on Raspberr
 
 So far, there are two executables in this project: `audio_project` for offline WAV-file processing, and `realtime_audio` for real-time USB audio playback via Raspberry Pi.
 
-In both executables, these functions are implemented and used: 
-- a gain function;
-- a lowpass filter;
-- a highpass filter.
+Both executables provide gain processing. `realtime_audio` adds a fully
+parametric peaking EQ, while the offline `audio_project` retains its low-pass
+and high-pass filters.
 
 In `audio_project`, an audio wav file reading function and an audio wav file writing function are also used.
 
@@ -40,7 +39,7 @@ If the interface appears as card `Device`, start a low-latency stereo pass-throu
   --period 128 --buffer 512 --gain 0.8
 ```
 
-Use a stable `CARD=` name from `/proc/asound/cards` instead of a numeric card index, which can change after reboot. Add `--highpass 80` and/or `--lowpass 12000` to enable the real-time filters. Start with the interface's direct-monitor control off, or you will hear both the dry and processed signals.
+Use a stable `CARD=` name from `/proc/asound/cards` instead of a numeric card index, which can change after reboot. The seven-band EQ starts flat. Start with the interface's direct-monitor control off, or you will hear both the dry and processed signals.
 
 At 48 kHz, a 128-frame period is about 2.7 ms. If ALSA reports overruns or underruns, try `--period 256 --buffer 1024`. For the lowest latency, disable Wi-Fi/Bluetooth if unused, select the Performance CPU governor, avoid USB hubs, and consider a Raspberry Pi real-time kernel after the basic setup is stable.
 
@@ -51,14 +50,16 @@ While audio is streaming, type commands in the same terminal and press Enter:
 ```text
 gain 0.6
 gaindb -20
-highpass 80
-lowpass 12000
+eq 80 3
+eq 640 -4
+eq 5120 2.5
+mix 50
 status
 ```
 
 `gain` is a linear amplitude multiplier: `0.5` is about -6 dB, `0.1` is -20 dB, and `0` is silence. The `gaindb` command is often more intuitive for volume control. Use `mute` as a diagnostic: if audio is still audible after muting, the USB interface's hardware direct-monitor path is enabled and is bypassing this program.
 
-The real-time low-pass and high-pass effects are fourth-order Butterworth filters (24 dB/octave), making cutoff changes substantially more audible than the original first-order filters. Use `highpass 0` or `lowpass 0` to disable that filter. Type `help` to display all real-time commands, or `quit` to stop the program. Updates take effect on the next audio period without restarting the ALSA stream.
+The real-time graphic EQ uses seven peaking biquads centered at 80, 160, 320, 640, 1280, 2560, and 5120 Hz. Each band has a fixed Q of 1.4 and an independently adjustable gain from -18 to +18 dB. Use `eqoff` to reset every band to 0 dB. The `mix` command accepts a wet percentage from 0 (fully dry) to 100 (fully effected). Output gain is applied after this mix, so it controls both paths equally. Type `help` to display all real-time commands, or `quit` to stop the program. Updates take effect on the next audio period without restarting the ALSA stream.
 
 ### Scarlett Solo input routing
 
@@ -95,7 +96,7 @@ The real-time executable includes a responsive browser interface—no separate w
 http://raspberrypi.local:8080
 ```
 
-The page provides live sliders for output gain, high-pass cutoff, and low-pass cutoff, plus the Scarlett input-routing selector. It also includes a DSP bypass button and an output peak meter calibrated in dBFS. Bypass skips gain and both filters while preserving the selected input routing. Terminal controls continue to work at the same time; use `bypass on` or `bypass off` there. Use another port with `--web-port PORT`, or disable the web interface with `--web-port 0`.
+The page places input routing, horizontal output-gain and dry/wet controls at the upper left, with seven compact graphic-EQ faders below and a vertical output peak meter on the right. The dry/wet slider continuously blends the routed dry signal with the gate-and-EQ processed signal. Terminal controls continue to work at the same time. Use another port with `--web-port PORT`, or disable the web interface with `--web-port 0`.
 
 If `raspberrypi.local` does not resolve, use the address printed by `hostname -I`, for example `http://192.168.1.50:8080`. The control page is available to devices on the local network and does not include authentication, so use it only on a trusted network.
 
@@ -106,7 +107,7 @@ The real-time application is divided by responsibility:
 - `src/realtime_audio.cpp`: application startup and capture/process/playback loop
 - `src/audio_config.cpp`: command-line options and ALSA device discovery
 - `src/pcm_device.cpp`: ALSA configuration, status, and xrun recovery
-- `src/realtime_processor.cpp`: routing, gain, gate, filters, bypass, and meters
+- `src/realtime_processor.cpp`: routing, gain, gate, seven-band EQ, dry/wet mixing, and meters
 - `src/command_interface.cpp`: interactive terminal commands
 - `src/web_control_server.cpp`: HTTP API and embedded webpage
 

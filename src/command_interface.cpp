@@ -16,9 +16,9 @@ void print_control_help() {
         << "  gain VALUE             Set linear gain, for example: gain 0.5\n"
         << "  gaindb DB              Set gain in decibels, for example: gaindb -20\n"
         << "  mute                    Set gain to zero\n"
-        << "  bypass on|off           Bypass gain, gate, and both filters\n"
-        << "  lowpass HZ             Set cutoff; 0 disables the low-pass filter\n"
-        << "  highpass HZ            Set cutoff; 0 disables the high-pass filter\n"
+        << "  mix PERCENT             Set effects mix: 0 is dry, 100 is wet\n"
+        << "  eq FREQUENCY DB         Set a band gain; e.g. eq 320 -4\n"
+        << "  eqoff                   Reset all seven EQ bands to 0 dB\n"
         << "  gate DB|off            Set or disable the input noise gate\n"
         << "  route MODE             stereo, input1, input2, or mix\n"
         << "  status                  Show current processing parameters\n"
@@ -28,8 +28,8 @@ void print_control_help() {
         << "  quit                    Stop audio and exit\n\n";
 }
 
-bool handle_control_input(Processor& processor, unsigned int sampleRate,
-                          const Pcm& capture, const Pcm& playback,
+bool handle_control_input(Processor& processor, const Pcm& capture,
+                          const Pcm& playback,
                           const RecoveryStats& recoveries) {
     pollfd input{STDIN_FILENO, POLLIN, 0};
     if(poll(&input, 1, 0) <= 0 || !(input.revents & POLLIN)) return true;
@@ -81,15 +81,8 @@ bool handle_control_input(Processor& processor, unsigned int sampleRate,
         processor.print_status();
         return true;
     }
-    if(command == "bypass") {
-        std::string value;
-        std::string extra;
-        if(!(commandLine >> value) || (commandLine >> extra) ||
-           (value != "on" && value != "off")) {
-            std::cerr << "Expected: bypass on|off\n";
-            return true;
-        }
-        processor.set_bypass(value == "on");
+    if(command == "eqoff") {
+        processor.reset_eq();
         processor.print_status();
         return true;
     }
@@ -118,8 +111,36 @@ bool handle_control_input(Processor& processor, unsigned int sampleRate,
         return true;
     }
 
-    if(command != "gain" && command != "gaindb" &&
-       command != "lowpass" && command != "highpass") {
+    if(command == "eq") {
+        float frequency = 0.0f;
+        float gain = 0.0f;
+        std::string extra;
+        if(!(commandLine >> frequency >> gain) || (commandLine >> extra) ||
+           !std::isfinite(frequency) || !std::isfinite(gain)) {
+            std::cerr << "Expected: eq FREQUENCY DB\n";
+            return true;
+        }
+        size_t band = Processor::EqBandCount;
+        for(size_t index = 0; index < Processor::EqBandCount; ++index) {
+            if(std::abs(frequency - Processor::EqFrequencies[index]) < 0.5f) {
+                band = index;
+                break;
+            }
+        }
+        if(band == Processor::EqBandCount) {
+            std::cerr << "Frequency must be 80, 160, 320, 640, 1280, 2560, or 5120 Hz.\n";
+            return true;
+        }
+        if(gain < -18.0f || gain > 18.0f) {
+            std::cerr << "EQ gain must be between -18 and +18 dB.\n";
+            return true;
+        }
+        processor.set_eq_gain_db(band, gain);
+        processor.print_status();
+        return true;
+    }
+
+    if(command != "gain" && command != "gaindb" && command != "mix") {
         std::cerr << "Unknown command. Type help for available controls.\n";
         return true;
     }
@@ -143,18 +164,12 @@ bool handle_control_input(Processor& processor, unsigned int sampleRate,
             return true;
         }
         processor.set_gain_db(value);
-    } else if(command == "lowpass") {
-        if(value < 0.0f || value >= sampleRate * 0.5f) {
-            std::cerr << "Low-pass cutoff must be 0 or below the Nyquist frequency.\n";
-            return true;
-        }
-        processor.set_low_pass(value);
     } else {
-        if(value < 0.0f || value >= sampleRate * 0.5f) {
-            std::cerr << "High-pass cutoff must be 0 or below the Nyquist frequency.\n";
+        if(value < 0.0f || value > 100.0f) {
+            std::cerr << "Mix must be between 0 and 100 percent.\n";
             return true;
         }
-        processor.set_high_pass(value);
+        processor.set_dry_wet(value / 100.0f);
     }
     processor.print_status();
     return true;
