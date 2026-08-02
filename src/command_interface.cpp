@@ -17,6 +17,8 @@ void print_control_help() {
         << "  gaindb DB              Set gain in decibels, for example: gaindb -20\n"
         << "  mute                    Set gain to zero\n"
         << "  mix PERCENT             Set effects mix: 0 is dry, 100 is wet\n"
+        << "  comp THRESH RATIO ATTACK RELEASE MAKEUP\n"
+        << "                          Set compressor values in dB, ratio, ms, ms, dB\n"
         << "  eq FREQUENCY DB         Set a band gain; e.g. eq 320 -4\n"
         << "  eqoff                   Reset all seven EQ bands to 0 dB\n"
         << "  gate DB|off            Set or disable the input noise gate\n"
@@ -136,6 +138,33 @@ bool handle_control_input(Processor& processor, const Pcm& capture,
             return true;
         }
         processor.set_eq_gain_db(band, gain);
+        processor.print_status();
+        return true;
+    }
+
+    if(command == "comp") {
+        float threshold = 0.0f;
+        float ratio = 0.0f;
+        float attack = 0.0f;
+        float release = 0.0f;
+        float makeup = 0.0f;
+        std::string extra;
+        if(!(commandLine >> threshold >> ratio >> attack >> release >> makeup) ||
+           (commandLine >> extra) || !std::isfinite(threshold) ||
+           !std::isfinite(ratio) || !std::isfinite(attack) ||
+           !std::isfinite(release) || !std::isfinite(makeup)) {
+            std::cerr << "Expected: comp THRESHOLD_DB RATIO ATTACK_MS RELEASE_MS MAKEUP_DB\n";
+            return true;
+        }
+        if(threshold < -60.0f || threshold > 0.0f ||
+           ratio < 1.0f || ratio > 20.0f || attack < 0.1f ||
+           attack > 200.0f || release < 10.0f || release > 2000.0f ||
+           makeup < 0.0f || makeup > 24.0f) {
+            std::cerr << "Compressor ranges: threshold -60..0 dB, ratio 1..20, "
+                         "attack 0.1..200 ms, release 10..2000 ms, makeup 0..24 dB.\n";
+            return true;
+        }
+        processor.set_compressor(threshold, ratio, attack, release, makeup);
         processor.print_status();
         return true;
     }

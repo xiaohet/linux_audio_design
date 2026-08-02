@@ -45,11 +45,17 @@ void Biquad::reset() {
 Processor::Processor(const Options& options)
     : rate_(options.rate), channels_(options.channels), gain_(options.gain),
       eqGainsDb_(options.eqGainsDb),
-      noiseGateDb_(options.noiseGateDb), routing_(options.routing),
+      noiseGateDb_(options.noiseGateDb),
+      compressorThresholdDb_(options.compressorThresholdDb),
+      compressorRatio_(options.compressorRatio),
+      compressorAttackMs_(options.compressorAttackMs),
+      compressorReleaseMs_(options.compressorReleaseMs),
+      compressorMakeupDb_(options.compressorMakeupDb), routing_(options.routing),
       equalizers_{Biquad(options.channels), Biquad(options.channels),
                   Biquad(options.channels), Biquad(options.channels),
                   Biquad(options.channels), Biquad(options.channels),
-                  Biquad(options.channels)} {
+                  Biquad(options.channels)},
+      dryFrame_(options.channels), wetFrame_(options.channels) {
     update_eq();
 }
 
@@ -87,27 +93,58 @@ void Processor::process(std::vector<int16_t>& samples, snd_pcm_sframes_t frames)
         gateGain_ = 1.0f;
     }
 
-    const float attack = 1.0f - std::exp(-1.0f / (0.005f * rate_));
-    const float release = 1.0f - std::exp(-1.0f / (0.040f * rate_));
+    const float gateAttack = 1.0f - std::exp(-1.0f / (0.005f * rate_));
+    const float gateRelease = 1.0f - std::exp(-1.0f / (0.040f * rate_));
+    const float compressorAttack = 1.0f - std::exp(
+        -1.0f / (compressorAttackMs_ * 0.001f * rate_));
+    const float compressorRelease = 1.0f - std::exp(
+        -1.0f / (compressorReleaseMs_ * 0.001f * rate_));
     float blockPeak = 0.0f;
-    for(size_t i = 0; i < count; ++i) {
-        const size_t channel = i % channels_;
-        const float dry = samples[i] / 32768.0f;
-        float wet = dry;
+    for(snd_pcm_sframes_t frame = 0; frame < frames; ++frame) {
+        float detector = 0.0f;
+        const size_t offset = static_cast<size_t>(frame) * channels_;
         if(gateEnabled) {
-            if(channel == 0) {
-                const float target = gateOpen_ ? 1.0f : 0.0f;
-                const float coefficient = target > gateGain_ ? attack : release;
-                gateGain_ += coefficient * (target - gateGain_);
-            }
-            wet *= gateGain_;
+            const float target = gateOpen_ ? 1.0f : 0.0f;
+            const float coefficient = target > gateGain_ ? gateAttack : gateRelease;
+            gateGain_ += coefficient * (target - gateGain_);
         }
-        for(auto& equalizer : equalizers_)
-            wet = equalizer.process(wet, channel);
-        float value = (dry * (1.0f - dryWet_) + wet * dryWet_) * gain_;
-        value = std::clamp(value, -1.0f, 0.999969f);
-        blockPeak = std::max(blockPeak, std::abs(value));
-        samples[i] = static_cast<int16_t>(std::lrint(value * 32768.0f));
+        for(size_t channel = 0; channel < channels_; ++channel) {
+            const size_t index = offset + channel;
+            dryFrame_[channel] = samples[index] / 32768.0f;
+            wetFrame_[channel] = dryFrame_[channel];
+            if(gateEnabled) wetFrame_[channel] *= gateGain_;
+            for(auto& equalizer : equalizers_)
+                wetFrame_[channel] = equalizer.process(wetFrame_[channel], channel);
+            detector = std::max(detector, std::abs(wetFrame_[channel]));
+        }
+
+        const float envelopeCoefficient = detector > compressorEnvelope_
+                                              ? compressorAttack
+                                              : compressorRelease;
+        compressorEnvelope_ += envelopeCoefficient *
+                               (detector - compressorEnvelope_);
+        float reductionDb = 0.0f;
+        if(compressorEnvelope_ > 0.0f) {
+            const float levelDb = 20.0f * std::log10(compressorEnvelope_);
+            if(levelDb > compressorThresholdDb_) {
+                const float compressedDb = compressorThresholdDb_ +
+                    (levelDb - compressorThresholdDb_) / compressorRatio_;
+                reductionDb = compressedDb - levelDb;
+            }
+        }
+        compressorGainReductionDb_ = reductionDb;
+        const float compressorGain = std::pow(
+            10.0f, (reductionDb + compressorMakeupDb_) / 20.0f);
+
+        for(size_t channel = 0; channel < channels_; ++channel) {
+            const size_t index = offset + channel;
+            const float wet = wetFrame_[channel] * compressorGain;
+            float value = (dryFrame_[channel] * (1.0f - dryWet_) +
+                           wet * dryWet_) * gain_;
+            value = std::clamp(value, -1.0f, 0.999969f);
+            blockPeak = std::max(blockPeak, std::abs(value));
+            samples[index] = static_cast<int16_t>(std::lrint(value * 32768.0f));
+        }
     }
     peak_ = std::max(blockPeak, peak_ * 0.92f);
 }
@@ -130,6 +167,16 @@ void Processor::set_routing(Routing value) {
 void Processor::set_dry_wet(float value) {
     std::lock_guard<std::mutex> lock(mutex_);
     dryWet_ = std::clamp(value, 0.0f, 1.0f);
+}
+
+void Processor::set_compressor(float thresholdDb, float ratio, float attackMs,
+                               float releaseMs, float makeupDb) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    compressorThresholdDb_ = std::clamp(thresholdDb, -60.0f, 0.0f);
+    compressorRatio_ = std::clamp(ratio, 1.0f, 20.0f);
+    compressorAttackMs_ = std::clamp(attackMs, 0.1f, 200.0f);
+    compressorReleaseMs_ = std::clamp(releaseMs, 10.0f, 2000.0f);
+    compressorMakeupDb_ = std::clamp(makeupDb, 0.0f, 24.0f);
 }
 
 void Processor::set_noise_gate_db(float value) {
@@ -165,6 +212,10 @@ void Processor::print_status() const {
                   << eqGainsDb_[band] << "dB";
     std::cout << " | Routing: " << routing_name(routing_)
               << " | Dry/wet: " << dryWet_ * 100.0f << "% wet"
+              << " | Compressor: " << compressorThresholdDb_ << " dB, "
+              << compressorRatio_ << ":1, " << compressorAttackMs_ << "/"
+              << compressorReleaseMs_ << " ms, makeup "
+              << compressorMakeupDb_ << " dB"
               << " | Gate: "
               << (noiseGateDb_ > -119.9f
                       ? std::to_string(noiseGateDb_) + " dBFS"
@@ -186,7 +237,9 @@ void Processor::print_signal_levels() const {
 Processor::Snapshot Processor::snapshot() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return {gain_, eqGainsDb_, peak_, input1Peak_, input2Peak_,
-            noiseGateDb_, gateOpen_, dryWet_, routing_};
+            noiseGateDb_, gateOpen_, dryWet_, compressorThresholdDb_,
+            compressorRatio_, compressorAttackMs_, compressorReleaseMs_,
+            compressorMakeupDb_, compressorGainReductionDb_, routing_};
 }
 
 void Processor::apply_routing(std::vector<int16_t>& samples,

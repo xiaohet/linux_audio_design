@@ -24,6 +24,11 @@ struct Options {
     snd_pcm_uframes_t bufferFrames = 2048;
     float gain = 0.8f;
     std::array<float, 7> eqGainsDb{};
+    float compressorThresholdDb = -18.0f;
+    float compressorRatio = 1.0f;
+    float compressorAttackMs = 10.0f;
+    float compressorReleaseMs = 100.0f;
+    float compressorMakeupDb = 0.0f;
     float noiseGateDb = -55.0f;
     bool diagnostics = false;
     Routing routing = Routing::Input2ToStereo;

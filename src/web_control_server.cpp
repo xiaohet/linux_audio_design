@@ -71,6 +71,7 @@ h1{font-size:clamp(2rem,8vw,4.6rem);line-height:.9;letter-spacing:-.06em;margin:
 input[type=range]{width:100%;height:34px;margin:0;accent-color:var(--accent);cursor:pointer}small{display:block;color:var(--muted);margin-top:8px}
 select{width:100%;background:#111610;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit}
 .controls-card{display:grid;gap:13px}.control-row .row{margin-bottom:4px}.control-row input{height:26px}.mix-ends{display:flex;justify-content:space-between;color:var(--muted);font-size:.68rem;margin-top:-4px}.routing-block .label{display:block;margin-bottom:7px}
+.compressor{border-top:1px solid var(--line);padding-top:11px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px 14px}.compressor-title{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline}.compressor-title small{margin:0;color:var(--accent2)}.comp-control .row{margin-bottom:0}.comp-control .label{font-size:.72rem}.comp-control .value{font-size:.75rem}.comp-control input{height:22px}
 .vertical-slider{writing-mode:vertical-lr;direction:rtl;width:24px!important;height:205px!important;flex:1}.eq-card{height:285px;display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.eq-control{display:flex;flex-direction:column;align-items:center;min-width:0}.eq-control .label{font-size:.7rem}.eq-control .value{font-size:.7rem;white-space:nowrap;margin:2px 0 7px}
 .utility{display:none}.peak-card{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;align-items:center}.peak-card .row{width:100%;flex-direction:column;align-items:center;gap:2px;text-align:center}.meter-stack{display:flex;flex:1;min-height:360px;align-items:stretch;gap:8px}.meter{width:30px;background:#0c100c;border:1px solid var(--line);border-radius:5px;overflow:hidden;display:flex;align-items:flex-end}.meter span{display:block;width:100%;height:0;background:linear-gradient(0deg,var(--accent2) 0 72%,#f4d35e 86%,#ff5c5c 100%);transition:height 70ms linear}
 .scale{display:flex;flex-direction:column;justify-content:space-between;color:var(--muted);font:600 .68rem ui-monospace,monospace;padding:1px 0}
@@ -99,6 +100,14 @@ footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
       <div class="row"><span class="label">Dry / wet</span><span id="dryWetValue" class="value">100% wet</span></div>
       <input id="dryWet" type="range" min="0" max="100" step="1" value="100" aria-label="Dry and wet effects mix">
       <div class="mix-ends"><span>Dry</span><span>Wet</span></div>
+    </div>
+    <div class="compressor">
+      <div class="compressor-title"><span class="label">Compressor</span><small id="compReduction">0.0 dB reduction</small></div>
+      <div class="comp-control"><div class="row"><span class="label">Threshold</span><span id="compThresholdValue" class="value">-18 dB</span></div><input id="compThreshold" type="range" min="-60" max="0" step="0.5" value="-18" aria-label="Compressor threshold in decibels"></div>
+      <div class="comp-control"><div class="row"><span class="label">Ratio</span><span id="compRatioValue" class="value">1.0:1</span></div><input id="compRatio" type="range" min="1" max="20" step="0.1" value="1" aria-label="Compressor ratio"></div>
+      <div class="comp-control"><div class="row"><span class="label">Attack</span><span id="compAttackValue" class="value">10 ms</span></div><input id="compAttack" type="range" min="0.1" max="200" step="0.1" value="10" aria-label="Compressor attack in milliseconds"></div>
+      <div class="comp-control"><div class="row"><span class="label">Release</span><span id="compReleaseValue" class="value">100 ms</span></div><input id="compRelease" type="range" min="10" max="2000" step="1" value="100" aria-label="Compressor release in milliseconds"></div>
+      <div class="comp-control"><div class="row"><span class="label">Makeup</span><span id="compMakeupValue" class="value">0.0 dB</span></div><input id="compMakeup" type="range" min="0" max="24" step="0.1" value="0" aria-label="Compressor makeup gain in decibels"></div>
     </div>
   </div>
   <div class="card eq-card">
@@ -154,22 +163,22 @@ footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
 </main>
 <script>
 const $=id=>document.getElementById(id);
-const gain=$('gain'),dryWet=$('dryWet'),eqGains=[0,1,2,3,4,5,6].map(i=>$('eq'+i)),routing=$('routing'),status=$('status'),peakBar=$('peakBar'),peakValue=$('peakValue');
+const gain=$('gain'),dryWet=$('dryWet'),eqGains=[0,1,2,3,4,5,6].map(i=>$('eq'+i)),compThreshold=$('compThreshold'),compRatio=$('compRatio'),compAttack=$('compAttack'),compRelease=$('compRelease'),compMakeup=$('compMakeup'),routing=$('routing'),status=$('status'),peakBar=$('peakBar'),peakValue=$('peakValue');
 let timer;
-function labels(){$('gainValue').textContent=(+gain.value).toFixed(1)+' dB';$('dryWetValue').textContent=Math.round(+dryWet.value)+'% wet';eqGains.forEach((control,i)=>$('eq'+i+'Value').textContent=(+control.value).toFixed(1)+' dB')}
+function labels(){$('gainValue').textContent=(+gain.value).toFixed(1)+' dB';$('dryWetValue').textContent=Math.round(+dryWet.value)+'% wet';eqGains.forEach((control,i)=>$('eq'+i+'Value').textContent=(+control.value).toFixed(1)+' dB');$('compThresholdValue').textContent=(+compThreshold.value).toFixed(1)+' dB';$('compRatioValue').textContent=(+compRatio.value).toFixed(1)+':1';$('compAttackValue').textContent=(+compAttack.value).toFixed(1)+' ms';$('compReleaseValue').textContent=Math.round(+compRelease.value)+' ms';$('compMakeupValue').textContent=(+compMakeup.value).toFixed(1)+' dB'}
 function showPeak(linear){const db=linear>0?20*Math.log10(linear):-120,p=Math.max(0,Math.min(100,(db+60)/60*100));peakBar.style.height=p+'%';peakValue.textContent=db<=-60?'<-60dBFS':db.toFixed(1)+'dBFS';peakBar.parentElement.setAttribute('aria-valuenow',Math.max(-60,db).toFixed(1))}
 async function send(){
   clearTimeout(timer);
-  const values={gainDb:gain.value,dryWet:(+dryWet.value/100),routing:routing.value};eqGains.forEach((control,i)=>values['eq'+i]=control.value);const q=new URLSearchParams(values);
+  const values={gainDb:gain.value,dryWet:(+dryWet.value/100),compThreshold:compThreshold.value,compRatio:compRatio.value,compAttack:compAttack.value,compRelease:compRelease.value,compMakeup:compMakeup.value,routing:routing.value};eqGains.forEach((control,i)=>values['eq'+i]=control.value);const q=new URLSearchParams(values);
   try{const r=await fetch('/api/set?'+q);if(!r.ok)throw Error();status.textContent='Live';status.className='status online'}catch{status.textContent='Disconnected';status.className='status'}
 }
 function changed(){labels();clearTimeout(timer);timer=setTimeout(send,45)}
-[gain,dryWet,...eqGains].forEach(x=>x.addEventListener('input',changed));routing.addEventListener('change',send);
+[gain,dryWet,compThreshold,compRatio,compAttack,compRelease,compMakeup,...eqGains].forEach(x=>x.addEventListener('input',changed));routing.addEventListener('change',send);
 async function load(){
-  try{const s=await(await fetch('/api/state')).json();gain.value=s.gainDb;dryWet.value=s.dryWet*100;eqGains.forEach((control,i)=>control.value=s.eqGains[i]);routing.value=s.routing;showPeak(s.peak);labels();status.textContent='Live';status.className='status online'}
+  try{const s=await(await fetch('/api/state')).json();gain.value=s.gainDb;dryWet.value=s.dryWet*100;eqGains.forEach((control,i)=>control.value=s.eqGains[i]);compThreshold.value=s.compThreshold;compRatio.value=s.compRatio;compAttack.value=s.compAttack;compRelease.value=s.compRelease;compMakeup.value=s.compMakeup;routing.value=s.routing;showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction';labels();status.textContent='Live';status.className='status online'}
   catch{status.textContent='Disconnected';status.className='status'}
 }
-async function meter(){try{const s=await(await fetch('/api/state')).json();showPeak(s.peak)}catch{}}
+async function meter(){try{const s=await(await fetch('/api/state')).json();showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction'}catch{}}
 load();setInterval(load,5000);setInterval(meter,90);
 </script></body></html>)HTML";
 }
@@ -204,6 +213,12 @@ std::string WebControlServer::state_json() const {
          << ",\"gateDb\":" << state.noiseGateDb
          << ",\"gateOpen\":" << (state.gateOpen ? "true" : "false")
          << ",\"dryWet\":" << state.dryWet
+         << ",\"compThreshold\":" << state.compressorThresholdDb
+         << ",\"compRatio\":" << state.compressorRatio
+         << ",\"compAttack\":" << state.compressorAttackMs
+         << ",\"compRelease\":" << state.compressorReleaseMs
+         << ",\"compMakeup\":" << state.compressorMakeupDb
+         << ",\"compReduction\":" << state.compressorGainReductionDb
          << ",\"routing\":\"" << routing_name(state.routing) << "\"}";
     return json.str();
 }
@@ -240,6 +255,29 @@ void WebControlServer::apply(const std::map<std::string, std::string>& parameter
             throw std::runtime_error("dryWet");
         processor_.set_dry_wet(dryWet);
     }
+    const auto state = processor_.snapshot();
+    float threshold = state.compressorThresholdDb;
+    float ratio = state.compressorRatio;
+    float attack = state.compressorAttackMs;
+    float release = state.compressorReleaseMs;
+    float makeup = state.compressorMakeupDb;
+    bool compressorChanged = false;
+    const auto readCompressor = [&](const char* name, float& target,
+                                    float minimum, float maximum) {
+        const auto parameter = parameters.find(name);
+        if(parameter == parameters.end()) return;
+        target = std::stof(parameter->second);
+        if(!std::isfinite(target) || target < minimum || target > maximum)
+            throw std::runtime_error(name);
+        compressorChanged = true;
+    };
+    readCompressor("compThreshold", threshold, -60.0f, 0.0f);
+    readCompressor("compRatio", ratio, 1.0f, 20.0f);
+    readCompressor("compAttack", attack, 0.1f, 200.0f);
+    readCompressor("compRelease", release, 10.0f, 2000.0f);
+    readCompressor("compMakeup", makeup, 0.0f, 24.0f);
+    if(compressorChanged)
+        processor_.set_compressor(threshold, ratio, attack, release, makeup);
 }
 
 void WebControlServer::send_response(int client, const char* status,
