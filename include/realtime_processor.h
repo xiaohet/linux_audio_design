@@ -43,6 +43,12 @@ public:
         float noiseGateDb;
         bool gateOpen;
         float dryWet;
+        float compressorThresholdDb;
+        float compressorRatio;
+        float compressorAttackMs;
+        float compressorReleaseMs;
+        float compressorMakeupDb;
+        float compressorGainReductionDb;
         Routing routing;
     };
 
@@ -53,6 +59,8 @@ public:
     void set_gain_db(float value);
     void set_routing(Routing value);
     void set_dry_wet(float value);
+    void set_compressor(float thresholdDb, float ratio, float attackMs,
+                        float releaseMs, float makeupDb);
     void set_noise_gate_db(float value);
     void set_eq_gain_db(size_t band, float value);
     void reset_eq();
@@ -75,7 +83,16 @@ private:
     float gateGain_ = 0.0f;
     bool gateOpen_ = false;
     float dryWet_ = 1.0f;
+    float compressorThresholdDb_;
+    float compressorRatio_;
+    float compressorAttackMs_;
+    float compressorReleaseMs_;
+    float compressorMakeupDb_;
+    float compressorEnvelope_ = 0.0f;
+    float compressorGainReductionDb_ = 0.0f;
     Routing routing_;
     std::array<Biquad, EqBandCount> equalizers_;
+    std::vector<float> dryFrame_;
+    std::vector<float> wetFrame_;
     mutable std::mutex mutex_;
 };

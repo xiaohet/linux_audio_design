@@ -54,12 +54,13 @@ eq 80 3
 eq 640 -4
 eq 5120 2.5
 mix 50
+comp -18 4 10 100 3
 status
 ```
 
 `gain` is a linear amplitude multiplier: `0.5` is about -6 dB, `0.1` is -20 dB, and `0` is silence. The `gaindb` command is often more intuitive for volume control. Use `mute` as a diagnostic: if audio is still audible after muting, the USB interface's hardware direct-monitor path is enabled and is bypassing this program.
 
-The real-time graphic EQ uses seven peaking biquads centered at 80, 160, 320, 640, 1280, 2560, and 5120 Hz. Each band has a fixed Q of 1.4 and an independently adjustable gain from -18 to +18 dB. Use `eqoff` to reset every band to 0 dB. The `mix` command accepts a wet percentage from 0 (fully dry) to 100 (fully effected). Output gain is applied after this mix, so it controls both paths equally. Type `help` to display all real-time commands, or `quit` to stop the program. Updates take effect on the next audio period without restarting the ALSA stream.
+The real-time graphic EQ uses seven peaking biquads centered at 80, 160, 320, 640, 1280, 2560, and 5120 Hz. Each band has a fixed Q of 1.4 and an independently adjustable gain from -18 to +18 dB. Use `eqoff` to reset every band to 0 dB. The stereo-linked compressor follows the EQ and provides threshold, ratio, attack, release, and makeup-gain controls; its default 1:1 ratio leaves the signal unchanged. The `mix` command accepts a wet percentage from 0 (fully dry) to 100 (fully effected). Output gain is applied after this mix, so it controls both paths equally. Type `help` to display all real-time commands, or `quit` to stop the program. Updates take effect on the next audio period without restarting the ALSA stream.
 
 ### Scarlett Solo input routing
 
@@ -96,7 +97,7 @@ The real-time executable includes a responsive browser interface—no separate w
 http://raspberrypi.local:8080
 ```
 
-The page places input routing, horizontal output-gain and dry/wet controls at the upper left, with seven compact graphic-EQ faders below and a vertical output peak meter on the right. The dry/wet slider continuously blends the routed dry signal with the gate-and-EQ processed signal. Terminal controls continue to work at the same time. Use another port with `--web-port PORT`, or disable the web interface with `--web-port 0`.
+The page places input routing, horizontal output-gain and dry/wet controls at the upper left, followed by compact compressor controls for threshold, ratio, attack, release, and makeup gain. Seven compact graphic-EQ faders sit below, with a vertical output peak meter on the right. A live gain-reduction readout shows when the compressor is working. The dry/wet slider continuously blends the routed dry signal with the gate, EQ, and compressor processed signal. Terminal controls continue to work at the same time. Use another port with `--web-port PORT`, or disable the web interface with `--web-port 0`.
 
 If `raspberrypi.local` does not resolve, use the address printed by `hostname -I`, for example `http://192.168.1.50:8080`. The control page is available to devices on the local network and does not include authentication, so use it only on a trusted network.
 
