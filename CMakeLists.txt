@@ -39,6 +39,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     )
     target_link_libraries(realtime_audio PRIVATE PkgConfig::ALSA Threads::Threads)
     target_compile_options(realtime_audio PRIVATE -Wall -Wextra -Wpedantic)
+
+    add_executable(deepfilter_benchmark
+        src/deepfilter_benchmark.cpp
+        src/read_wav_file.cpp
+        src/write_wav_file.cpp
+    )
+    target_link_libraries(deepfilter_benchmark PRIVATE ${CMAKE_DL_LIBS})
+    target_compile_options(deepfilter_benchmark PRIVATE -Wall -Wextra -Wpedantic)
 else()
     message(STATUS "realtime_audio is only built on Linux (ALSA required)")
 endif()

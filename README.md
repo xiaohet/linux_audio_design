@@ -101,6 +101,77 @@ The page places input routing, horizontal output-gain and dry/wet controls at th
 
 If `raspberrypi.local` does not resolve, use the address printed by `hostname -I`, for example `http://192.168.1.50:8080`. The control page is available to devices on the local network and does not include authentication, so use it only on a trusted network.
 
+### DeepFilterNet standalone benchmark
+
+`deepfilter_benchmark` measures the native DeepFilterNet inference runtime without ALSA. DeepFilterNet is loaded at runtime, so the rest of this project still builds and runs when DeepFilterNet is not installed. The benchmark currently uses the project's 48 kHz mono processing plan; stereo WAV input is downmixed to mono.
+
+Build DeepFilterNet's native C API on the 64-bit Raspberry Pi OS. Rust 1.70 or newer is required by the current DeepFilterNet crate:
+
+```bash
+sudo apt update
+sudo apt install -y git cargo build-essential cmake pkg-config clang
+rustc --version
+cd ~
+git clone --depth 1 https://github.com/Rikorose/DeepFilterNet.git
+cd DeepFilterNet
+cargo build --release -p deep_filter --features capi
+```
+
+If the packaged `rustc` is older than 1.70, install a current Rust toolchain with the official `rustup` installer, reopen the terminal (or source `$HOME/.cargo/env`), and repeat the build.
+
+This normally creates `~/DeepFilterNet/target/release/libdf.so`. The repository contains compatible ONNX model archives under `models/`. DeepFilterNet2 is the best initial Raspberry Pi 4 comparison because its published Pi benchmark reported real-time operation.
+
+Build this project after pulling the benchmark changes:
+
+```bash
+cd ~/linux_audio_design
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
+./build/deepfilter_benchmark --help
+```
+
+First run a short functional test using the benchmark's deterministic synthetic tone-and-noise input:
+
+```bash
+./build/deepfilter_benchmark \
+  --library "$HOME/DeepFilterNet/target/release/libdf.so" \
+  --model "$HOME/DeepFilterNet/models/DeepFilterNet2_onnx.tar.gz" \
+  --warmup 5 --duration 30 \
+  --csv deepfilter_short.csv
+```
+
+For the meaningful performance test, avoid writing enhanced audio because a long output recording consumes memory and adds copying work. Use a 30-second warm-up followed by ten measured minutes:
+
+```bash
+vcgencmd measure_temp
+vcgencmd get_throttled
+
+/usr/bin/time -v ./build/deepfilter_benchmark \
+  --library "$HOME/DeepFilterNet/target/release/libdf.so" \
+  --model "$HOME/DeepFilterNet/models/DeepFilterNet2_onnx.tar.gz" \
+  --warmup 30 --duration 600 \
+  --csv deepfilter_10min.csv
+
+vcgencmd measure_temp
+vcgencmd get_throttled
+```
+
+The executable returns status `0` for a conservative pass, `2` when the measurements need review, and `1` for a setup/runtime error. A pass requires average RTF below 0.60, 99th-percentile processing below 80% of the model frame deadline, and zero deadline misses. The full report includes model initialization time, mean/median/p95/p99/maximum frame times, RTF, deadline misses, process CPU use, peak resident memory, and Pi temperature when the Linux thermal sensor is available. `vcgencmd get_throttled` should report `0x0`; otherwise fix power or cooling before trusting the result.
+
+For a listening test, prepare a conventional 48 kHz, 16-bit PCM WAV containing voice, guitar, or recorded noise. Keep this run short and write the enhanced mono result:
+
+```bash
+./build/deepfilter_benchmark \
+  --library "$HOME/DeepFilterNet/target/release/libdf.so" \
+  --model "$HOME/DeepFilterNet/models/DeepFilterNet2_onnx.tar.gz" \
+  --input test_voice_or_guitar.wav \
+  --warmup 2 --duration 30 \
+  --output deepfilter_enhanced.wav \
+  --csv deepfilter_listening.csv
+```
+
+Listen specifically for removed guitar sustain or harmonics, watery artifacts, damaged pick transients, and changes to voice intelligibility. Repeat the long performance test at least three times, including once after the Pi has warmed up. Run it before integrating DeepFilterNet into `realtime_audio`; inference-only success does not yet prove that USB audio plus the web interface will remain underrun-free.
+
 ### Real-time source layout
 
 The real-time application is divided by responsibility:
@@ -111,6 +182,7 @@ The real-time application is divided by responsibility:
 - `src/realtime_processor.cpp`: routing, gain, gate, seven-band EQ, dry/wet mixing, and meters
 - `src/command_interface.cpp`: interactive terminal commands
 - `src/web_control_server.cpp`: HTTP API and embedded webpage
+- `src/deepfilter_benchmark.cpp`: standalone native DeepFilterNet performance and listening benchmark
 
 Each module's public classes and structures are declared in the matching header under `include/`.
 
