@@ -80,7 +80,7 @@ footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
 </style>
 </head>
 <body><main>
-<header><div><div class="eyebrow">Raspberry Pi · USB Audio</div><h1>Sound<br>shaping.</h1></div><div id="status" class="status">Connecting…</div></header>
+<header><div><div class="eyebrow">Raspberry Pi · USB Audio</div><h1>Sound shaping.</h1></div><div id="status" class="status">Connecting…</div></header>
 <section class="console">
   <div class="card controls-card">
     <div class="routing-block">
@@ -103,11 +103,16 @@ footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
     </div>
     <div class="compressor">
       <div class="compressor-title"><span class="label">Compressor</span><small id="compReduction">0.0 dB reduction</small></div>
-      <div class="comp-control"><div class="row"><span class="label">Threshold</span><span id="compThresholdValue" class="value">-18 dB</span></div><input id="compThreshold" type="range" min="-60" max="0" step="0.5" value="-18" aria-label="Compressor threshold in decibels"></div>
-      <div class="comp-control"><div class="row"><span class="label">Ratio</span><span id="compRatioValue" class="value">1.0:1</span></div><input id="compRatio" type="range" min="1" max="20" step="0.1" value="1" aria-label="Compressor ratio"></div>
-      <div class="comp-control"><div class="row"><span class="label">Attack</span><span id="compAttackValue" class="value">10 ms</span></div><input id="compAttack" type="range" min="0.1" max="200" step="0.1" value="10" aria-label="Compressor attack in milliseconds"></div>
-      <div class="comp-control"><div class="row"><span class="label">Release</span><span id="compReleaseValue" class="value">100 ms</span></div><input id="compRelease" type="range" min="10" max="2000" step="1" value="100" aria-label="Compressor release in milliseconds"></div>
-      <div class="comp-control"><div class="row"><span class="label">Makeup</span><span id="compMakeupValue" class="value">0.0 dB</span></div><input id="compMakeup" type="range" min="0" max="24" step="0.1" value="0" aria-label="Compressor makeup gain in decibels"></div>
+      <div class="comp-control"><div class="row"><span class="label">Threshold</span><span id="compThresholdValue" class="value">-18 dB</span></div>
+      <input id="compThreshold" type="range" min="-60" max="0" step="0.5" value="-18" aria-label="Compressor threshold in decibels"></div>
+      <div class="comp-control"><div class="row"><span class="label">Ratio</span><span id="compRatioValue" class="value">1.0:1</span></div>
+      <input id="compRatio" type="range" min="1" max="20" step="0.1" value="1" aria-label="Compressor ratio"></div>
+      <div class="comp-control"><div class="row"><span class="label">Attack</span><span id="compAttackValue" class="value">10 ms</span></div>
+      <input id="compAttack" type="range" min="0.1" max="200" step="0.1" value="10" aria-label="Compressor attack in milliseconds"></div>
+      <div class="comp-control"><div class="row"><span class="label">Release</span><span id="compReleaseValue" class="value">100 ms</span></div>
+      <input id="compRelease" type="range" min="10" max="2000" step="1" value="100" aria-label="Compressor release in milliseconds"></div>
+      <div class="comp-control"><div class="row"><span class="label">Makeup</span><span id="compMakeupValue" class="value">0.0 dB</span></div>
+      <input id="compMakeup" type="range" min="0" max="24" step="0.1" value="0" aria-label="Compressor makeup gain in decibels"></div>
     </div>
   </div>
   <div class="card eq-card">
