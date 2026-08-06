@@ -1,0 +1,48 @@
+
+DeepFilterNet standalone benchmark
+----------------------------------
+Library:                    /home/xiaohet/DeepFilterNet/target/aarch64-unknown-linux-gnu/release/libdeepfilter.so
+Model:                      /home/xiaohet/DeepFilterNet/models/DeepFilterNet3_onnx.tar.gz
+Input:                      synthetic tone + noise
+Sample rate:                48000 Hz
+Frame length:               480 samples
+Frames measured:            60000
+Model initialization          905.607 ms
+Audio duration                600.000 s
+Wall time                     313.658 s
+Real-time factor                0.523 RTF
+Mean frame time                 5.223 ms
+Median frame time               5.205 ms
+95th percentile                 5.328 ms
+99th percentile                 5.662 ms
+Maximum frame time              8.902 ms
+Frame deadline                 10.000 ms
+Deadline misses                     0 frames (0.0000%)
+Process CPU / wall             99.980 % one core
+Peak resident memory           40.605 MiB
+Temperature before             35.050 C
+Temperature after              43.329 C
+Conservative real-time result: PASS
+	Command being timed: "./build/deepfilter_benchmark --library /home/xiaohet/DeepFilterNet/target/aarch64-unknown-linux-gnu/release/libdeepfilter.so --model /home/xiaohet/DeepFilterNet/models/DeepFilterNet3_onnx.tar.gz --warmup 30 --duration 600 --csv deepfilter3_headless.csv"
+	User time (seconds): 330.18
+	System time (seconds): 0.05
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 5:30.69
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 41580
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 100
+	Minor (reclaiming a frame) page faults: 9034
+	Voluntary context switches: 178
+	Involuntary context switches: 3213
+	Swaps: 0
+	File system inputs: 38520
+	File system outputs: 3152
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

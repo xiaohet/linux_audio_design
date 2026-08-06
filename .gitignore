@@ -1,7 +1,9 @@
 build/
+build-wsl/
 *.o
 *.out
 *.wav
 .vscode/
+DeepFilterNet/
 *Zone.Identifier*
 

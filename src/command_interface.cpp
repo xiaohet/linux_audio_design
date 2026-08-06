@@ -22,6 +22,8 @@ void print_control_help() {
         << "  eq FREQUENCY DB         Set a band gain; e.g. eq 320 -4\n"
         << "  eqoff                   Reset all seven EQ bands to 0 dB\n"
         << "  gate DB|off            Set or disable the input noise gate\n"
+        << "  noise PERCENT          DeepFilterNet mix: 0 is off, 100 is full\n"
+        << "  dfstats                Show DeepFilterNet timing and FIFO counters\n"
         << "  route MODE             stereo, input1, input2, or mix\n"
         << "  status                  Show current processing parameters\n"
         << "  levels                  Show pre-DSP input and output peak levels\n"
@@ -61,6 +63,24 @@ bool handle_control_input(Processor& processor, const Pcm& capture,
     }
     if(command == "levels") {
         processor.print_signal_levels();
+        return true;
+    }
+    if(command == "dfstats") {
+        const auto state = processor.snapshot();
+        if(!state.deepFilterAvailable) {
+            std::cerr << "DeepFilterNet is unavailable.\n";
+        } else {
+            std::cerr << "DeepFilterNet: strength="
+                      << state.noiseSuppression * 100.0f
+                      << "%, frames=" << state.deepFilterFrames
+                      << ", mean=" << state.deepFilterMeanMs
+                      << " ms, max=" << state.deepFilterMaximumMs
+                      << " ms, deadline misses="
+                      << state.deepFilterDeadlineMisses
+                      << ", input overruns=" << state.deepFilterInputOverruns
+                      << ", output underruns="
+                      << state.deepFilterOutputUnderruns << '\n';
+        }
         return true;
     }
     if(command == "route") {
@@ -169,7 +189,8 @@ bool handle_control_input(Processor& processor, const Pcm& capture,
         return true;
     }
 
-    if(command != "gain" && command != "gaindb" && command != "mix") {
+    if(command != "gain" && command != "gaindb" && command != "mix" &&
+       command != "noise") {
         std::cerr << "Unknown command. Type help for available controls.\n";
         return true;
     }
@@ -193,12 +214,18 @@ bool handle_control_input(Processor& processor, const Pcm& capture,
             return true;
         }
         processor.set_gain_db(value);
-    } else {
+    } else if(command == "mix") {
         if(value < 0.0f || value > 100.0f) {
             std::cerr << "Mix must be between 0 and 100 percent.\n";
             return true;
         }
         processor.set_dry_wet(value / 100.0f);
+    } else {
+        if(value < 0.0f || value > 100.0f) {
+            std::cerr << "Noise suppression must be between 0 and 100 percent.\n";
+            return true;
+        }
+        processor.set_noise_suppression(value / 100.0f);
     }
     processor.print_status();
     return true;

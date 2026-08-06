@@ -80,7 +80,7 @@ footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
 </style>
 </head>
 <body><main>
-<header><div><div class="eyebrow">Raspberry Pi · USB Audio</div><h1>Sound shaping.</h1></div><div id="status" class="status">Connecting…</div></header>
+<header><div><div class="eyebrow">Raspberry Pi · USB Audio</div><h1>Sound<br>shaping.</h1></div><div id="status" class="status">Connecting…</div></header>
 <section class="console">
   <div class="card controls-card">
     <div class="routing-block">
@@ -96,23 +96,23 @@ footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
     <div class="row"><span class="label">Output gain</span><span id="gainValue" class="value">−1.9 dB</span></div>
     <input id="gain" type="range" min="-60" max="12" step="0.1" value="-1.9" aria-label="Output gain in decibels">
     </div>
-    <div class="control-row">
-      <div class="row"><span class="label">Dry / wet</span><span id="dryWetValue" class="value">100% wet</span></div>
-      <input id="dryWet" type="range" min="0" max="100" step="1" value="100" aria-label="Dry and wet effects mix">
-      <div class="mix-ends"><span>Dry</span><span>Wet</span></div>
-    </div>
+	    <div class="control-row">
+	      <div class="row"><span class="label">Dry / wet</span><span id="dryWetValue" class="value">100% wet</span></div>
+	      <input id="dryWet" type="range" min="0" max="100" step="1" value="100" aria-label="Dry and wet effects mix">
+	      <div class="mix-ends"><span>Dry</span><span>Wet</span></div>
+	    </div>
+	    <div class="control-row" id="noiseBlock">
+	      <div class="row"><span class="label">Noise suppression</span><span id="noiseValue" class="value">Off</span></div>
+	      <input id="noise" type="range" min="0" max="100" step="1" value="0" aria-label="DeepFilterNet noise suppression strength">
+	      <div class="mix-ends"><span>Off</span><span>Full</span></div>
+	    </div>
     <div class="compressor">
       <div class="compressor-title"><span class="label">Compressor</span><small id="compReduction">0.0 dB reduction</small></div>
-      <div class="comp-control"><div class="row"><span class="label">Threshold</span><span id="compThresholdValue" class="value">-18 dB</span></div>
-      <input id="compThreshold" type="range" min="-60" max="0" step="0.5" value="-18" aria-label="Compressor threshold in decibels"></div>
-      <div class="comp-control"><div class="row"><span class="label">Ratio</span><span id="compRatioValue" class="value">1.0:1</span></div>
-      <input id="compRatio" type="range" min="1" max="20" step="0.1" value="1" aria-label="Compressor ratio"></div>
-      <div class="comp-control"><div class="row"><span class="label">Attack</span><span id="compAttackValue" class="value">10 ms</span></div>
-      <input id="compAttack" type="range" min="0.1" max="200" step="0.1" value="10" aria-label="Compressor attack in milliseconds"></div>
-      <div class="comp-control"><div class="row"><span class="label">Release</span><span id="compReleaseValue" class="value">100 ms</span></div>
-      <input id="compRelease" type="range" min="10" max="2000" step="1" value="100" aria-label="Compressor release in milliseconds"></div>
-      <div class="comp-control"><div class="row"><span class="label">Makeup</span><span id="compMakeupValue" class="value">0.0 dB</span></div>
-      <input id="compMakeup" type="range" min="0" max="24" step="0.1" value="0" aria-label="Compressor makeup gain in decibels"></div>
+      <div class="comp-control"><div class="row"><span class="label">Threshold</span><span id="compThresholdValue" class="value">-18 dB</span></div><input id="compThreshold" type="range" min="-60" max="0" step="0.5" value="-18" aria-label="Compressor threshold in decibels"></div>
+      <div class="comp-control"><div class="row"><span class="label">Ratio</span><span id="compRatioValue" class="value">1.0:1</span></div><input id="compRatio" type="range" min="1" max="20" step="0.1" value="1" aria-label="Compressor ratio"></div>
+      <div class="comp-control"><div class="row"><span class="label">Attack</span><span id="compAttackValue" class="value">10 ms</span></div><input id="compAttack" type="range" min="0.1" max="200" step="0.1" value="10" aria-label="Compressor attack in milliseconds"></div>
+      <div class="comp-control"><div class="row"><span class="label">Release</span><span id="compReleaseValue" class="value">100 ms</span></div><input id="compRelease" type="range" min="10" max="2000" step="1" value="100" aria-label="Compressor release in milliseconds"></div>
+      <div class="comp-control"><div class="row"><span class="label">Makeup</span><span id="compMakeupValue" class="value">0.0 dB</span></div><input id="compMakeup" type="range" min="0" max="24" step="0.1" value="0" aria-label="Compressor makeup gain in decibels"></div>
     </div>
   </div>
   <div class="card eq-card">
@@ -168,19 +168,19 @@ footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
 </main>
 <script>
 const $=id=>document.getElementById(id);
-const gain=$('gain'),dryWet=$('dryWet'),eqGains=[0,1,2,3,4,5,6].map(i=>$('eq'+i)),compThreshold=$('compThreshold'),compRatio=$('compRatio'),compAttack=$('compAttack'),compRelease=$('compRelease'),compMakeup=$('compMakeup'),routing=$('routing'),status=$('status'),peakBar=$('peakBar'),peakValue=$('peakValue');
+	const gain=$('gain'),dryWet=$('dryWet'),noise=$('noise'),eqGains=[0,1,2,3,4,5,6].map(i=>$('eq'+i)),compThreshold=$('compThreshold'),compRatio=$('compRatio'),compAttack=$('compAttack'),compRelease=$('compRelease'),compMakeup=$('compMakeup'),routing=$('routing'),status=$('status'),peakBar=$('peakBar'),peakValue=$('peakValue');
 let timer;
-function labels(){$('gainValue').textContent=(+gain.value).toFixed(1)+' dB';$('dryWetValue').textContent=Math.round(+dryWet.value)+'% wet';eqGains.forEach((control,i)=>$('eq'+i+'Value').textContent=(+control.value).toFixed(1)+' dB');$('compThresholdValue').textContent=(+compThreshold.value).toFixed(1)+' dB';$('compRatioValue').textContent=(+compRatio.value).toFixed(1)+':1';$('compAttackValue').textContent=(+compAttack.value).toFixed(1)+' ms';$('compReleaseValue').textContent=Math.round(+compRelease.value)+' ms';$('compMakeupValue').textContent=(+compMakeup.value).toFixed(1)+' dB'}
+	function labels(){$('gainValue').textContent=(+gain.value).toFixed(1)+' dB';$('dryWetValue').textContent=Math.round(+dryWet.value)+'% wet';$('noiseValue').textContent=+noise.value===0?'Off':Math.round(+noise.value)+'%';eqGains.forEach((control,i)=>$('eq'+i+'Value').textContent=(+control.value).toFixed(1)+' dB');$('compThresholdValue').textContent=(+compThreshold.value).toFixed(1)+' dB';$('compRatioValue').textContent=(+compRatio.value).toFixed(1)+':1';$('compAttackValue').textContent=(+compAttack.value).toFixed(1)+' ms';$('compReleaseValue').textContent=Math.round(+compRelease.value)+' ms';$('compMakeupValue').textContent=(+compMakeup.value).toFixed(1)+' dB'}
 function showPeak(linear){const db=linear>0?20*Math.log10(linear):-120,p=Math.max(0,Math.min(100,(db+60)/60*100));peakBar.style.height=p+'%';peakValue.textContent=db<=-60?'<-60dBFS':db.toFixed(1)+'dBFS';peakBar.parentElement.setAttribute('aria-valuenow',Math.max(-60,db).toFixed(1))}
 async function send(){
   clearTimeout(timer);
-  const values={gainDb:gain.value,dryWet:(+dryWet.value/100),compThreshold:compThreshold.value,compRatio:compRatio.value,compAttack:compAttack.value,compRelease:compRelease.value,compMakeup:compMakeup.value,routing:routing.value};eqGains.forEach((control,i)=>values['eq'+i]=control.value);const q=new URLSearchParams(values);
+	  const values={gainDb:gain.value,dryWet:(+dryWet.value/100),noiseSuppression:(+noise.value/100),compThreshold:compThreshold.value,compRatio:compRatio.value,compAttack:compAttack.value,compRelease:compRelease.value,compMakeup:compMakeup.value,routing:routing.value};eqGains.forEach((control,i)=>values['eq'+i]=control.value);const q=new URLSearchParams(values);
   try{const r=await fetch('/api/set?'+q);if(!r.ok)throw Error();status.textContent='Live';status.className='status online'}catch{status.textContent='Disconnected';status.className='status'}
 }
 function changed(){labels();clearTimeout(timer);timer=setTimeout(send,45)}
-[gain,dryWet,compThreshold,compRatio,compAttack,compRelease,compMakeup,...eqGains].forEach(x=>x.addEventListener('input',changed));routing.addEventListener('change',send);
+	[gain,dryWet,noise,compThreshold,compRatio,compAttack,compRelease,compMakeup,...eqGains].forEach(x=>x.addEventListener('input',changed));routing.addEventListener('change',send);
 async function load(){
-  try{const s=await(await fetch('/api/state')).json();gain.value=s.gainDb;dryWet.value=s.dryWet*100;eqGains.forEach((control,i)=>control.value=s.eqGains[i]);compThreshold.value=s.compThreshold;compRatio.value=s.compRatio;compAttack.value=s.compAttack;compRelease.value=s.compRelease;compMakeup.value=s.compMakeup;routing.value=s.routing;showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction';labels();status.textContent='Live';status.className='status online'}
+	  try{const s=await(await fetch('/api/state')).json();gain.value=s.gainDb;dryWet.value=s.dryWet*100;noise.value=s.noiseSuppression*100;noise.disabled=!s.deepFilterAvailable;$('noiseBlock').style.opacity=s.deepFilterAvailable?'1':'.45';eqGains.forEach((control,i)=>control.value=s.eqGains[i]);compThreshold.value=s.compThreshold;compRatio.value=s.compRatio;compAttack.value=s.compAttack;compRelease.value=s.compRelease;compMakeup.value=s.compMakeup;routing.value=s.routing;showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction';labels();status.textContent='Live';status.className='status online'}
   catch{status.textContent='Disconnected';status.className='status'}
 }
 async function meter(){try{const s=await(await fetch('/api/state')).json();showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction'}catch{}}
@@ -223,7 +223,19 @@ std::string WebControlServer::state_json() const {
          << ",\"compAttack\":" << state.compressorAttackMs
          << ",\"compRelease\":" << state.compressorReleaseMs
          << ",\"compMakeup\":" << state.compressorMakeupDb
-         << ",\"compReduction\":" << state.compressorGainReductionDb
+	         << ",\"compReduction\":" << state.compressorGainReductionDb
+	         << ",\"deepFilterAvailable\":"
+	         << (state.deepFilterAvailable ? "true" : "false")
+	         << ",\"noiseSuppression\":" << state.noiseSuppression
+	         << ",\"deepFilterMeanMs\":" << state.deepFilterMeanMs
+	         << ",\"deepFilterMaximumMs\":" << state.deepFilterMaximumMs
+	         << ",\"deepFilterFrames\":" << state.deepFilterFrames
+	         << ",\"deepFilterDeadlineMisses\":"
+	         << state.deepFilterDeadlineMisses
+	         << ",\"deepFilterInputOverruns\":"
+	         << state.deepFilterInputOverruns
+	         << ",\"deepFilterOutputUnderruns\":"
+	         << state.deepFilterOutputUnderruns
          << ",\"routing\":\"" << routing_name(state.routing) << "\"}";
     return json.str();
 }
@@ -253,13 +265,20 @@ void WebControlServer::apply(const std::map<std::string, std::string>& parameter
             throw std::runtime_error("gate");
         processor_.set_noise_gate_db(threshold);
     }
-    value = parameters.find("dryWet");
+	    value = parameters.find("dryWet");
     if(value != parameters.end()) {
         const float dryWet = std::stof(value->second);
         if(dryWet < 0.0f || dryWet > 1.0f)
             throw std::runtime_error("dryWet");
-        processor_.set_dry_wet(dryWet);
-    }
+	        processor_.set_dry_wet(dryWet);
+	    }
+	    value = parameters.find("noiseSuppression");
+	    if(value != parameters.end()) {
+	        const float strength = std::stof(value->second);
+	        if(strength < 0.0f || strength > 1.0f)
+	            throw std::runtime_error("noiseSuppression");
+	        processor_.set_noise_suppression(strength);
+	    }
     const auto state = processor_.snapshot();
     float threshold = state.compressorThresholdDb;
     float ratio = state.compressorRatio;
