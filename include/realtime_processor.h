@@ -7,7 +7,10 @@
 #include <array>
 #include <cstdint>
 #include <mutex>
+#include <memory>
 #include <vector>
+
+class DeepFilterProcessor;
 
 class Biquad {
 public:
@@ -49,10 +52,19 @@ public:
         float compressorReleaseMs;
         float compressorMakeupDb;
         float compressorGainReductionDb;
+        bool deepFilterAvailable;
+        float noiseSuppression;
+        double deepFilterMeanMs;
+        double deepFilterMaximumMs;
+        uint64_t deepFilterFrames;
+        uint64_t deepFilterDeadlineMisses;
+        uint64_t deepFilterInputOverruns;
+        uint64_t deepFilterOutputUnderruns;
         Routing routing;
     };
 
     explicit Processor(const Options& options);
+    ~Processor();
 
     void process(std::vector<int16_t>& samples, snd_pcm_sframes_t frames);
     void set_gain(float value);
@@ -62,6 +74,7 @@ public:
     void set_compressor(float thresholdDb, float ratio, float attackMs,
                         float releaseMs, float makeupDb);
     void set_noise_gate_db(float value);
+    void set_noise_suppression(float value);
     void set_eq_gain_db(size_t band, float value);
     void reset_eq();
     void print_status() const;
@@ -94,5 +107,6 @@ private:
     std::array<Biquad, EqBandCount> equalizers_;
     std::vector<float> dryFrame_;
     std::vector<float> wetFrame_;
+    std::unique_ptr<DeepFilterProcessor> deepFilter_;
     mutable std::mutex mutex_;
 };

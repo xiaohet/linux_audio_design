@@ -41,6 +41,11 @@ void print_usage(const char* name) {
         << "  Seven-band EQ frequencies are fixed at 80, 160, 320, 640,\n"
         << "  1280, 2560, and 5120 Hz; gains default to 0 dB.\n"
         << "  --gate-db DB           Noise-gate threshold (default -55; -120 disables)\n"
+        << "  --deepfilter-library PATH  DeepFilterNet v0.5.6 C library\n"
+        << "  --deepfilter-model PATH    DeepFilterNet3 ONNX model archive\n"
+        << "  --noise-suppression PERCENT  Initial suppression mix (default 0)\n"
+        << "  --deepfilter-atten-limit DB  Maximum suppression (default 20)\n"
+        << "  --deepfilter-delay SAMPLES   Model delay before scheduling buffer (default 1440)\n"
         << "  --routing MODE         stereo, input1, input2, or mix (default input2)\n"
         << "  --web-port PORT        Browser control port (default 8080; 0 disables)\n"
         << "  --diagnostics          Print negotiated ALSA settings and rate-limited xrun details\n"
@@ -129,6 +134,14 @@ Options parse_options(int argc, char** argv) {
         else if(argument == "--gain-db")
             options.gain = std::pow(10.0f, number<float>(value, argument) / 20.0f);
         else if(argument == "--gate-db") options.noiseGateDb = number<float>(value, argument);
+        else if(argument == "--deepfilter-library") options.deepFilterLibrary = value;
+        else if(argument == "--deepfilter-model") options.deepFilterModel = value;
+        else if(argument == "--noise-suppression")
+            options.deepFilterStrength = number<float>(value, argument) / 100.0f;
+        else if(argument == "--deepfilter-atten-limit")
+            options.deepFilterAttenuationLimitDb = number<float>(value, argument);
+        else if(argument == "--deepfilter-delay")
+            options.deepFilterDelaySamples = number<unsigned int>(value, argument);
         else if(argument == "--routing") options.routing = parse_routing(value);
         else if(argument == "--web-port") {
             try {
@@ -149,5 +162,10 @@ Options parse_options(int argc, char** argv) {
         throw std::runtime_error("--buffer must be at least twice --period");
     if(options.noiseGateDb < -120.0f || options.noiseGateDb > -10.0f)
         throw std::runtime_error("--gate-db must be between -120 and -10 dBFS");
+    if(options.deepFilterStrength < 0.0f || options.deepFilterStrength > 1.0f)
+        throw std::runtime_error("--noise-suppression must be between 0 and 100");
+    if(options.deepFilterAttenuationLimitDb < 0.0f ||
+       options.deepFilterAttenuationLimitDb > 100.0f)
+        throw std::runtime_error("--deepfilter-atten-limit must be between 0 and 100 dB");
     return options;
 }

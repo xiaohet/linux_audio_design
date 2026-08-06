@@ -1,4 +1,5 @@
 #include "realtime_processor.h"
+#include "deepfilter_processor.h"
 
 #include <algorithm>
 #include <cmath>
@@ -57,7 +58,24 @@ Processor::Processor(const Options& options)
                   Biquad(options.channels)},
       dryFrame_(options.channels), wetFrame_(options.channels) {
     update_eq();
+    try {
+        deepFilter_ = std::make_unique<DeepFilterProcessor>(options);
+        if(deepFilter_->available()) {
+            std::cout << "DeepFilterNet ready: strength="
+                      << options.deepFilterStrength * 100.0f
+                      << "%, attenuation limit="
+                      << options.deepFilterAttenuationLimitDb << " dB\n";
+        } else {
+            std::cerr << "DeepFilterNet unavailable; noise suppression is disabled. "
+                         "Check --deepfilter-library and --deepfilter-model.\n";
+        }
+    } catch(const std::exception& error) {
+        std::cerr << "DeepFilterNet disabled: " << error.what() << '\n';
+        deepFilter_.reset();
+    }
 }
+
+Processor::~Processor() = default;
 
 void Processor::process(std::vector<int16_t>& samples, snd_pcm_sframes_t frames) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -77,6 +95,8 @@ void Processor::process(std::vector<int16_t>& samples, snd_pcm_sframes_t frames)
     input2Peak_ = std::max(input2BlockPeak, input2Peak_ * 0.92f);
 
     apply_routing(samples, frames);
+    if(deepFilter_)
+        deepFilter_->process(samples, static_cast<size_t>(frames), channels_, routing_);
     const size_t count = static_cast<size_t>(frames) * channels_;
     float routedPeak = 0.0f;
     for(size_t i = 0; i < count; ++i)
@@ -188,6 +208,11 @@ void Processor::set_noise_gate_db(float value) {
     }
 }
 
+void Processor::set_noise_suppression(float value) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if(deepFilter_) deepFilter_->set_strength(value);
+}
+
 void Processor::set_eq_gain_db(size_t band, float value) {
     std::lock_guard<std::mutex> lock(mutex_);
     if(band >= EqBandCount) return;
@@ -210,7 +235,12 @@ void Processor::print_status() const {
     for(size_t band = 0; band < EqBandCount; ++band)
         std::cout << ' ' << EqFrequencies[band] << "Hz="
                   << eqGainsDb_[band] << "dB";
+    const auto deep = deepFilter_ ? deepFilter_->snapshot()
+                                  : DeepFilterProcessor::Snapshot{};
     std::cout << " | Routing: " << routing_name(routing_)
+              << " | Noise suppression: "
+              << (deep.available ? std::to_string(deep.strength * 100.0f) + "%"
+                                 : "unavailable")
               << " | Dry/wet: " << dryWet_ * 100.0f << "% wet"
               << " | Compressor: " << compressorThresholdDb_ << " dB, "
               << compressorRatio_ << ":1, " << compressorAttackMs_ << "/"
@@ -228,18 +258,29 @@ void Processor::print_signal_levels() const {
     const auto db = [](float peak) {
         return peak > 0.0f ? 20.0f * std::log10(peak) : -120.0f;
     };
+    const auto deep = deepFilter_ ? deepFilter_->snapshot()
+                                  : DeepFilterProcessor::Snapshot{};
     std::cerr << "Signal peaks: input1=" << db(input1Peak_)
               << " dBFS, input2=" << db(input2Peak_)
               << " dBFS, output=" << db(peak_)
-              << " dBFS, gate=" << (gateOpen_ ? "open" : "closed") << '\n';
+              << " dBFS, gate=" << (gateOpen_ ? "open" : "closed")
+              << ", deepfilter="
+              << (deep.available ? std::to_string(deep.strength * 100.0f) + "%"
+                                 : "unavailable") << '\n';
 }
 
 Processor::Snapshot Processor::snapshot() const {
     std::lock_guard<std::mutex> lock(mutex_);
+    const auto deep = deepFilter_ ? deepFilter_->snapshot()
+                                  : DeepFilterProcessor::Snapshot{};
     return {gain_, eqGainsDb_, peak_, input1Peak_, input2Peak_,
             noiseGateDb_, gateOpen_, dryWet_, compressorThresholdDb_,
             compressorRatio_, compressorAttackMs_, compressorReleaseMs_,
-            compressorMakeupDb_, compressorGainReductionDb_, routing_};
+            compressorMakeupDb_, compressorGainReductionDb_,
+            deep.available, deep.strength, deep.meanMilliseconds,
+            deep.maximumMilliseconds, deep.framesProcessed,
+            deep.deadlineMisses, deep.inputOverruns,
+            deep.outputUnderruns, routing_};
 }
 
 void Processor::apply_routing(std::vector<int16_t>& samples,
