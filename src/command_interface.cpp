@@ -13,8 +13,7 @@
 void print_control_help() {
     std::cout
         << "\nReal-time controls (type a command and press Enter):\n"
-        << "  gain VALUE             Set linear gain, for example: gain 0.5\n"
-        << "  gaindb DB              Set gain in decibels, for example: gaindb -20\n"
+        << "  gain DB                Set output gain in decibels, for example: gain -20\n"
         << "  mute                    Set gain to zero\n"
         << "  mix PERCENT             Set effects mix: 0 is dry, 100 is wet\n"
         << "  comp THRESH RATIO ATTACK RELEASE MAKEUP\n"
@@ -79,7 +78,9 @@ bool handle_control_input(Processor& processor, const Pcm& capture,
                       << state.deepFilterDeadlineMisses
                       << ", input overruns=" << state.deepFilterInputOverruns
                       << ", output underruns="
-                      << state.deepFilterOutputUnderruns << '\n';
+                      << state.deepFilterOutputUnderruns
+                      << ", stale samples discarded="
+                      << state.deepFilterStaleOutputSamples << '\n';
         }
         return true;
     }
@@ -189,7 +190,7 @@ bool handle_control_input(Processor& processor, const Pcm& capture,
         return true;
     }
 
-    if(command != "gain" && command != "gaindb" && command != "mix" &&
+    if(command != "gain" && command != "mix" &&
        command != "noise") {
         std::cerr << "Unknown command. Type help for available controls.\n";
         return true;
@@ -203,12 +204,6 @@ bool handle_control_input(Processor& processor, const Pcm& capture,
     }
 
     if(command == "gain") {
-        if(value < 0.0f || value > 10.0f) {
-            std::cerr << "Gain must be between 0 and 10.\n";
-            return true;
-        }
-        processor.set_gain(value);
-    } else if(command == "gaindb") {
         if(value < -120.0f || value > 20.0f) {
             std::cerr << "Gain must be between -120 and +20 dB.\n";
             return true;

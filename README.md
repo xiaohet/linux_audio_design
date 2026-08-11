@@ -50,8 +50,7 @@ Press Ctrl+C to stop. Run `./build/realtime_audio --help` for all options.
 While audio is streaming, type commands in the same terminal and press Enter:
 
 ```text
-gain 0.6
-gaindb -20
+gain -20
 eq 80 3
 eq 640 -4
 eq 5120 2.5
@@ -62,7 +61,7 @@ noise 60
 dfstats
 ```
 
-`gain` is a linear amplitude multiplier: `0.5` is about -6 dB, `0.1` is -20 dB, and `0` is silence. The `gaindb` command is often more intuitive for volume control. Use `mute` as a diagnostic: if audio is still audible after muting, the USB interface's hardware direct-monitor path is enabled and is bypassing this program.
+`gain` sets output gain in decibels, matching the browser control; for example, `gain -6` reduces the level by approximately half and `gain 0` is unity gain. Use `mute` as a diagnostic: if audio is still audible after muting, the USB interface's hardware direct-monitor path is enabled and is bypassing this program.
 
 The real-time graphic EQ uses seven peaking biquads centered at 80, 160, 320, 640, 1280, 2560, and 5120 Hz. Each band has a fixed Q of 1.4 and an independently adjustable gain from -18 to +18 dB. Use `eqoff` to reset every band to 0 dB. The stereo-linked compressor follows the EQ and provides threshold, ratio, attack, release, and makeup-gain controls; its default 1:1 ratio leaves the signal unchanged. The `mix` command accepts a wet percentage from 0 (fully dry) to 100 (fully effected). Output gain is applied after this mix, so it controls both paths equally. Type `help` to display all real-time commands, or `quit` to stop the program. Updates take effect on the next audio period without restarting the ALSA stream.
 
@@ -101,7 +100,7 @@ The real-time executable includes a responsive browser interface—no separate w
 http://raspberrypi.local:8080
 ```
 
-The page places input routing, horizontal output-gain and dry/wet controls at the upper left, followed by compact compressor controls for threshold, ratio, attack, release, and makeup gain. Seven compact graphic-EQ faders sit below, with a vertical output peak meter on the right. A live gain-reduction readout shows when the compressor is working. The dry/wet slider continuously blends the routed dry signal with the gate, EQ, and compressor processed signal. Terminal controls continue to work at the same time. Use another port with `--web-port PORT`, or disable the web interface with `--web-port 0`.
+The compact top row places input routing, output gain, dry/wet, and noise suppression on the left, with a separate single-column compressor card on its right. Seven compact graphic-EQ faders sit below, with a smaller vertical output peak meter on the far right. A live gain-reduction readout shows when the compressor is working. The dry/wet slider continuously blends the routed dry signal with the gate, EQ, and compressor processed signal. Terminal controls continue to work at the same time. Use another port with `--web-port PORT`, or disable the web interface with `--web-port 0`.
 
 The Noise suppression slider is independent of the effects dry/wet slider. Zero is
 off; higher values blend in more DeepFilterNet output. DeepFilterNet is a speech
@@ -141,9 +140,9 @@ If DeepFilterNet lives elsewhere, specify both paths:
 
 The model is mono and processes 480-sample frames. A worker thread and lock-free
 sample FIFOs adapt that frame size to ALSA periods without waiting in the audio
-thread. Two model frames are reserved for scheduling variation. The dry path is
+thread. Four model frames are reserved for scheduling variation. The dry path is
 delayed by the model's 1440-sample STFT/lookahead delay plus this scheduling
-reserve before dry/wet suppression mixing. At 48 kHz this is about 50 ms total.
+reserve before dry/wet suppression mixing. At 48 kHz this is about 70 ms total.
 The suppression result is duplicated to both playback channels; enabling it while
 using `route stereo` therefore intentionally produces dual mono.
 
@@ -158,9 +157,12 @@ dfstats
 ```
 
 `dfstats` reports inference mean/maximum time, model deadline misses, input FIFO
-overruns, and processed-output underruns. An isolated model deadline miss may be
-absorbed by the scheduling reserve; output underruns are the critical failure
-counter. Keep the attenuation limit conservative for non-speech material:
+overruns, processed-output fallback periods, and stale samples discarded during
+timeline recovery. An isolated model deadline miss may be absorbed by the
+scheduling reserve. A fallback period means processed audio was unavailable and
+latency-aligned dry audio was used instead. Sequence tags prevent late processed
+samples from being mixed with current dry samples after a long scheduling stall.
+Keep the attenuation limit conservative for non-speech material:
 
 ```bash
 ./build/realtime_audio --deepfilter-atten-limit 20
@@ -172,6 +174,29 @@ when using a model with different settings:
 
 ```bash
 ./build/realtime_audio --deepfilter-delay SAMPLES
+```
+
+The browser shows a compact live DeepFilter status below the suppression slider.
+For monitoring without VS Code, leave the application in `tmux` and query its
+HTTP state from an ordinary SSH session:
+
+```bash
+sudo apt install -y tmux jq
+tmux new -s audio
+./build/realtime_audio
+# Detach with Ctrl+B, then D.
+```
+
+In another SSH connection:
+
+```bash
+watch -n 2 'curl -s http://127.0.0.1:8080/api/state | jq {
+  mean_ms:.deepFilterMeanMs,
+  max_ms:.deepFilterMaximumMs,
+  late:.deepFilterDeadlineMisses,
+  fallback_periods:.deepFilterOutputUnderruns,
+  stale_samples:.deepFilterStaleOutputSamples
+}'
 ```
 
 ### DeepFilterNet standalone benchmark

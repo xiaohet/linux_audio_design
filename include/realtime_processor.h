@@ -60,6 +60,7 @@ public:
         uint64_t deepFilterDeadlineMisses;
         uint64_t deepFilterInputOverruns;
         uint64_t deepFilterOutputUnderruns;
+        uint64_t deepFilterStaleOutputSamples;
         Routing routing;
     };
 

@@ -32,9 +32,9 @@ struct Options {
     float compressorMakeupDb = 0.0f;
     float noiseGateDb = -55.0f;
     std::string deepFilterLibrary =
-        "$HOME/DeepFilterNet/target/aarch64-unknown-linux-gnu/release/libdeepfilter.so";
+        "DeepFilterNet/target/aarch64-unknown-linux-gnu/release/libdeepfilter.so";
     std::string deepFilterModel =
-        "$HOME/DeepFilterNet/models/DeepFilterNet3_onnx.tar.gz";
+        "DeepFilterNet/models/DeepFilterNet3_onnx.tar.gz";
     float deepFilterStrength = 0.0f;
     float deepFilterAttenuationLimitDb = 20.0f;
     size_t deepFilterDelaySamples = 1440;

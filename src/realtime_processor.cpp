@@ -280,7 +280,7 @@ Processor::Snapshot Processor::snapshot() const {
             deep.available, deep.strength, deep.meanMilliseconds,
             deep.maximumMilliseconds, deep.framesProcessed,
             deep.deadlineMisses, deep.inputOverruns,
-            deep.outputUnderruns, routing_};
+            deep.outputUnderruns, deep.staleOutputSamples, routing_};
 }
 
 void Processor::apply_routing(std::vector<int16_t>& samples,

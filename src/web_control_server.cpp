@@ -62,26 +62,27 @@ const char* WebControlServer::page() {
 <style>
 :root{color-scheme:dark;--bg:#111410;--panel:#1b211b;--line:#344033;--text:#f1f4ec;--muted:#a9b3a5;--accent:#b8f34a;--accent2:#67d7c4}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 80% 0,#26351f 0,transparent 38%),var(--bg);color:var(--text);font:16px/1.45 system-ui,sans-serif}
-main{width:min(900px,calc(100% - 28px));margin:auto;padding:30px 0 44px}
+main{width:min(850px,calc(100% - 24px));margin:auto;padding:22px 0 34px}
 header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:24px}
 h1{font-size:clamp(2rem,8vw,4.6rem);line-height:.9;letter-spacing:-.06em;margin:0}.eyebrow{color:var(--accent);font-size:.75rem;font-weight:800;letter-spacing:.18em;text-transform:uppercase;margin-bottom:12px}
 .status{border:1px solid var(--line);border-radius:99px;padding:8px 13px;color:var(--muted);white-space:nowrap}.status.online{color:var(--accent);border-color:#607d36}
-.console{display:grid;grid-template-columns:minmax(520px,1fr) 140px;grid-template-rows:auto auto;gap:12px}.card{background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 18px 50px #0004}
+.console{display:grid;grid-template-columns:minmax(500px,1fr) 112px;grid-template-rows:auto auto;gap:10px}.card{background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:15px;padding:11px;box-shadow:0 14px 40px #0004}.top-row{grid-column:1;grid-row:1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(190px,.85fr);gap:10px}
 .row{display:flex;align-items:baseline;justify-content:space-between;gap:18px;margin-bottom:15px}.label{font-weight:750}.value{font:700 1.3rem ui-monospace,monospace;color:var(--accent)}
 input[type=range]{width:100%;height:34px;margin:0;accent-color:var(--accent);cursor:pointer}small{display:block;color:var(--muted);margin-top:8px}
 select{width:100%;background:#111610;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit}
-.controls-card{display:grid;gap:13px}.control-row .row{margin-bottom:4px}.control-row input{height:26px}.mix-ends{display:flex;justify-content:space-between;color:var(--muted);font-size:.68rem;margin-top:-4px}.routing-block .label{display:block;margin-bottom:7px}
-.compressor{border-top:1px solid var(--line);padding-top:11px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px 14px}.compressor-title{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline}.compressor-title small{margin:0;color:var(--accent2)}.comp-control .row{margin-bottom:0}.comp-control .label{font-size:.72rem}.comp-control .value{font-size:.75rem}.comp-control input{height:22px}
-.vertical-slider{writing-mode:vertical-lr;direction:rtl;width:24px!important;height:205px!important;flex:1}.eq-card{height:285px;display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.eq-control{display:flex;flex-direction:column;align-items:center;min-width:0}.eq-control .label{font-size:.7rem}.eq-control .value{font-size:.7rem;white-space:nowrap;margin:2px 0 7px}
-.utility{display:none}.peak-card{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;align-items:center}.peak-card .row{width:100%;flex-direction:column;align-items:center;gap:2px;text-align:center}.meter-stack{display:flex;flex:1;min-height:360px;align-items:stretch;gap:8px}.meter{width:30px;background:#0c100c;border:1px solid var(--line);border-radius:5px;overflow:hidden;display:flex;align-items:flex-end}.meter span{display:block;width:100%;height:0;background:linear-gradient(0deg,var(--accent2) 0 72%,#f4d35e 86%,#ff5c5c 100%);transition:height 70ms linear}
+.controls-card{display:grid;gap:8px}.controls-card select{padding:7px;font-size:.82rem}.control-row .row{margin-bottom:1px}.control-row .label{font-size:.75rem}.control-row .value{font-size:.8rem}.control-row input{height:20px}.mix-ends{display:flex;justify-content:space-between;color:var(--muted);font-size:.62rem;margin-top:-5px}.routing-block .label{display:block;margin-bottom:4px;font-size:.75rem}.controls-card small{font-size:.61rem;line-height:1.25;margin-top:3px}
+.compressor{display:grid;grid-template-columns:1fr;align-content:start;gap:5px}.compressor-title{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px}.compressor-title small{margin:0;color:var(--accent2);font-size:.62rem}.comp-control .row{margin-bottom:-2px}.comp-control .label{font-size:.68rem}.comp-control .value{font-size:.68rem}.comp-control input{height:17px}
+.vertical-slider{writing-mode:vertical-lr;direction:rtl;width:20px!important;height:175px!important;flex:1}.eq-card{grid-column:1;grid-row:2;height:245px;display:grid;grid-template-columns:repeat(7,1fr);gap:2px}.eq-control{display:flex;flex-direction:column;align-items:center;min-width:0}.eq-control .label{font-size:.66rem}.eq-control .value{font-size:.65rem;white-space:nowrap;margin:1px 0 5px}
+.utility{display:none}.peak-card{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;align-items:center}.peak-card .row{width:100%;flex-direction:column;align-items:center;gap:1px;text-align:center;margin-bottom:8px}.peak-card .label{font-size:.72rem}.peak-card .value{font-size:.72rem}.meter-stack{display:flex;flex:1;min-height:285px;max-height:400px;align-items:stretch;gap:6px}.meter{width:24px;background:#0c100c;border:1px solid var(--line);border-radius:5px;overflow:hidden;display:flex;align-items:flex-end}.meter span{display:block;width:100%;height:0;background:linear-gradient(0deg,var(--accent2) 0 72%,#f4d35e 86%,#ff5c5c 100%);transition:height 70ms linear}
 .scale{display:flex;flex-direction:column;justify-content:space-between;color:var(--muted);font:600 .68rem ui-monospace,monospace;padding:1px 0}
 footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
-@media(max-width:700px){main{width:min(640px,calc(100% - 16px))}.console{grid-template-columns:minmax(450px,1fr) 120px;overflow-x:auto}.vertical-slider{height:180px!important}.eq-card{height:255px}.meter-stack{min-height:330px}}
+@media(max-width:700px){main{width:min(640px,calc(100% - 12px))}.console{grid-template-columns:minmax(430px,1fr) 94px;overflow-x:auto}.top-row{grid-template-columns:minmax(230px,1.1fr) minmax(180px,.9fr)}.vertical-slider{height:155px!important}.eq-card{height:220px}.meter-stack{min-height:260px}}
 </style>
 </head>
 <body><main>
-<header><div><div class="eyebrow">Raspberry Pi · USB Audio</div><h1>Sound<br>shaping.</h1></div><div id="status" class="status">Connecting…</div></header>
+<header><div><div class="eyebrow">Raspberry Pi · USB Audio</div><h2>Sound shaping.</h2></div><div id="status" class="status">Connecting…</div></header>
 <section class="console">
+  <div class="top-row">
   <div class="card controls-card">
     <div class="routing-block">
       <span class="label">Input routing</span>
@@ -105,8 +106,10 @@ footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
 	      <div class="row"><span class="label">Noise suppression</span><span id="noiseValue" class="value">Off</span></div>
 	      <input id="noise" type="range" min="0" max="100" step="1" value="0" aria-label="DeepFilterNet noise suppression strength">
 	      <div class="mix-ends"><span>Off</span><span>Full</span></div>
+	      <small id="dfStatus">DeepFilterNet status loading...</small>
 	    </div>
-    <div class="compressor">
+  </div>
+    <div class="card compressor">
       <div class="compressor-title"><span class="label">Compressor</span><small id="compReduction">0.0 dB reduction</small></div>
       <div class="comp-control"><div class="row"><span class="label">Threshold</span><span id="compThresholdValue" class="value">-18 dB</span></div><input id="compThreshold" type="range" min="-60" max="0" step="0.5" value="-18" aria-label="Compressor threshold in decibels"></div>
       <div class="comp-control"><div class="row"><span class="label">Ratio</span><span id="compRatioValue" class="value">1.0:1</span></div><input id="compRatio" type="range" min="1" max="20" step="0.1" value="1" aria-label="Compressor ratio"></div>
@@ -171,7 +174,8 @@ const $=id=>document.getElementById(id);
 	const gain=$('gain'),dryWet=$('dryWet'),noise=$('noise'),eqGains=[0,1,2,3,4,5,6].map(i=>$('eq'+i)),compThreshold=$('compThreshold'),compRatio=$('compRatio'),compAttack=$('compAttack'),compRelease=$('compRelease'),compMakeup=$('compMakeup'),routing=$('routing'),status=$('status'),peakBar=$('peakBar'),peakValue=$('peakValue');
 let timer;
 	function labels(){$('gainValue').textContent=(+gain.value).toFixed(1)+' dB';$('dryWetValue').textContent=Math.round(+dryWet.value)+'% wet';$('noiseValue').textContent=+noise.value===0?'Off':Math.round(+noise.value)+'%';eqGains.forEach((control,i)=>$('eq'+i+'Value').textContent=(+control.value).toFixed(1)+' dB');$('compThresholdValue').textContent=(+compThreshold.value).toFixed(1)+' dB';$('compRatioValue').textContent=(+compRatio.value).toFixed(1)+':1';$('compAttackValue').textContent=(+compAttack.value).toFixed(1)+' ms';$('compReleaseValue').textContent=Math.round(+compRelease.value)+' ms';$('compMakeupValue').textContent=(+compMakeup.value).toFixed(1)+' dB'}
-function showPeak(linear){const db=linear>0?20*Math.log10(linear):-120,p=Math.max(0,Math.min(100,(db+60)/60*100));peakBar.style.height=p+'%';peakValue.textContent=db<=-60?'<-60dBFS':db.toFixed(1)+'dBFS';peakBar.parentElement.setAttribute('aria-valuenow',Math.max(-60,db).toFixed(1))}
+	function showPeak(linear){const db=linear>0?20*Math.log10(linear):-120,p=Math.max(0,Math.min(100,(db+60)/60*100));peakBar.style.height=p+'%';peakValue.textContent=db<=-60?'<-60dBFS':db.toFixed(1)+'dBFS';peakBar.parentElement.setAttribute('aria-valuenow',Math.max(-60,db).toFixed(1))}
+	function showDf(s){$('dfStatus').textContent=s.deepFilterAvailable?'DF '+s.deepFilterMeanMs.toFixed(2)+' ms avg · '+s.deepFilterDeadlineMisses+' late · '+s.deepFilterOutputUnderruns+' fallback periods · '+s.deepFilterStaleOutputSamples+' stale samples dropped':'DeepFilterNet unavailable'}
 async function send(){
   clearTimeout(timer);
 	  const values={gainDb:gain.value,dryWet:(+dryWet.value/100),noiseSuppression:(+noise.value/100),compThreshold:compThreshold.value,compRatio:compRatio.value,compAttack:compAttack.value,compRelease:compRelease.value,compMakeup:compMakeup.value,routing:routing.value};eqGains.forEach((control,i)=>values['eq'+i]=control.value);const q=new URLSearchParams(values);
@@ -180,10 +184,10 @@ async function send(){
 function changed(){labels();clearTimeout(timer);timer=setTimeout(send,45)}
 	[gain,dryWet,noise,compThreshold,compRatio,compAttack,compRelease,compMakeup,...eqGains].forEach(x=>x.addEventListener('input',changed));routing.addEventListener('change',send);
 async function load(){
-	  try{const s=await(await fetch('/api/state')).json();gain.value=s.gainDb;dryWet.value=s.dryWet*100;noise.value=s.noiseSuppression*100;noise.disabled=!s.deepFilterAvailable;$('noiseBlock').style.opacity=s.deepFilterAvailable?'1':'.45';eqGains.forEach((control,i)=>control.value=s.eqGains[i]);compThreshold.value=s.compThreshold;compRatio.value=s.compRatio;compAttack.value=s.compAttack;compRelease.value=s.compRelease;compMakeup.value=s.compMakeup;routing.value=s.routing;showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction';labels();status.textContent='Live';status.className='status online'}
+	  try{const s=await(await fetch('/api/state')).json();gain.value=s.gainDb;dryWet.value=s.dryWet*100;noise.value=s.noiseSuppression*100;noise.disabled=!s.deepFilterAvailable;$('noiseBlock').style.opacity=s.deepFilterAvailable?'1':'.45';eqGains.forEach((control,i)=>control.value=s.eqGains[i]);compThreshold.value=s.compThreshold;compRatio.value=s.compRatio;compAttack.value=s.compAttack;compRelease.value=s.compRelease;compMakeup.value=s.compMakeup;routing.value=s.routing;showPeak(s.peak);showDf(s);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction';labels();status.textContent='Live';status.className='status online'}
   catch{status.textContent='Disconnected';status.className='status'}
 }
-async function meter(){try{const s=await(await fetch('/api/state')).json();showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction'}catch{}}
+	async function meter(){try{const s=await(await fetch('/api/state')).json();showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction'}catch{}}
 load();setInterval(load,5000);setInterval(meter,90);
 </script></body></html>)HTML";
 }
@@ -236,6 +240,8 @@ std::string WebControlServer::state_json() const {
 	         << state.deepFilterInputOverruns
 	         << ",\"deepFilterOutputUnderruns\":"
 	         << state.deepFilterOutputUnderruns
+	         << ",\"deepFilterStaleOutputSamples\":"
+	         << state.deepFilterStaleOutputSamples
          << ",\"routing\":\"" << routing_name(state.routing) << "\"}";
     return json.str();
 }

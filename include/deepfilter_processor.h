@@ -24,6 +24,7 @@ public:
         uint64_t deadlineMisses = 0;
         uint64_t inputOverruns = 0;
         uint64_t outputUnderruns = 0;
+        uint64_t staleOutputSamples = 0;
     };
 
     explicit DeepFilterProcessor(const Options& options);
@@ -54,12 +55,18 @@ private:
     size_t frameLength_ = 0;
     unsigned int sampleRate_ = 48000;
     size_t dryDelaySamples_ = 0;
+    size_t modelDelaySamples_ = 0;
+    size_t schedulingDelaySamples_ = 0;
     std::unique_ptr<SampleRing> inputRing_;
     std::unique_ptr<SampleRing> outputRing_;
     std::vector<float> dryDelay_;
+    std::vector<float> dryHistory_;
+    std::vector<uint64_t> dryHistorySequences_;
     size_t dryDelayPosition_ = 0;
     std::vector<float> workerInput_;
     std::vector<float> workerOutput_;
+    std::vector<uint64_t> workerSequences_;
+    uint64_t audioSequence_ = 0;
 
     std::atomic<bool> available_{false};
     std::atomic<bool> stop_{false};
@@ -75,4 +82,5 @@ private:
     std::atomic<uint64_t> deadlineMisses_{0};
     std::atomic<uint64_t> inputOverruns_{0};
     std::atomic<uint64_t> outputUnderruns_{0};
+    std::atomic<uint64_t> staleOutputSamples_{0};
 };
