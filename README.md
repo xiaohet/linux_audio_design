@@ -47,6 +47,39 @@ At 48 kHz, a 128-frame period is about 2.7 ms. If ALSA reports overruns or under
 
 Press Ctrl+C to stop. Run `./build/realtime_audio --help` for all options.
 
+### MCP3008 hardware gain control
+
+The optional MCP3008 controller reads a 3.3 V-referenced ADC channel and maps
+values 0 through 1023 to output gain from -60 through +12 dB. First verify the
+SPI wiring without starting the audio system:
+
+```bash
+./build/mcp3008_test /dev/spidev0.0 0
+```
+
+CH0 connected through equal 10 kOhm resistors to 3.3 V and ground should read
+approximately 512 (1.65 V). Ground should read approximately 0, and 3.3 V
+approximately 1023. Never apply 5 V to an MCP3008 input connected to the Pi.
+
+Enable CH0 hardware gain control by adding `--mcp3008` to the normal command:
+
+```bash
+./build/realtime_audio \
+  --capture plughw:CARD=Device \
+  --playback plughw:CARD=Device \
+  --period 128 --buffer 512 \
+  --mcp3008 --mcp3008-channel 0
+```
+
+The equal-resistor test point produces about -24 dB. The reading is smoothed
+and small ADC changes are ignored to prevent audible gain jitter. A 10 kOhm
+linear potentiometer can later replace the divider: connect its outer terminals
+to 3.3 V and ground and its wiper to CH0. While MCP3008 control is enabled it is
+the authoritative gain source, so browser or terminal gain changes are replaced
+by the next changed hardware reading. The range can be customized with
+`--hardware-gain-min DB` and `--hardware-gain-max DB`; another SPI chip-select
+can be selected with `--mcp3008-device /dev/spidev0.1`.
+
 While audio is streaming, type commands in the same terminal and press Enter:
 
 ```text

@@ -34,12 +34,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/audio_config.cpp
         src/command_interface.cpp
         src/deepfilter_processor.cpp
+        src/mcp3008.cpp
         src/pcm_device.cpp
         src/realtime_processor.cpp
         src/web_control_server.cpp
     )
     target_link_libraries(realtime_audio PRIVATE PkgConfig::ALSA Threads::Threads ${CMAKE_DL_LIBS})
     target_compile_options(realtime_audio PRIVATE -Wall -Wextra -Wpedantic)
+
+    add_executable(mcp3008_test
+        src/mcp3008.cpp
+        src/mcp3008_test.cpp
+    )
+    target_compile_options(mcp3008_test PRIVATE -Wall -Wextra -Wpedantic)
 
     add_executable(deepfilter_benchmark
         src/deepfilter_benchmark.cpp

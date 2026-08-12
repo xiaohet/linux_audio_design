@@ -48,6 +48,11 @@ void print_usage(const char* name) {
         << "  --deepfilter-delay SAMPLES   Model delay before scheduling buffer (default 1440)\n"
         << "  --routing MODE         stereo, input1, input2, or mix (default input2)\n"
         << "  --web-port PORT        Browser control port (default 8080; 0 disables)\n"
+        << "  --mcp3008              Control output gain from an MCP3008 ADC\n"
+        << "  --mcp3008-device PATH  SPI device (default /dev/spidev0.0)\n"
+        << "  --mcp3008-channel N    ADC channel 0-7 (default 0)\n"
+        << "  --hardware-gain-min DB Gain at ADC value 0 (default -60)\n"
+        << "  --hardware-gain-max DB Gain at ADC value 1023 (default +12)\n"
         << "  --diagnostics          Print negotiated ALSA settings and rate-limited xrun details\n"
         << "  --list-devices         Print ALSA PCM device names\n"
         << "  --help                 Show this help\n";
@@ -120,6 +125,10 @@ Options parse_options(int argc, char** argv) {
             options.diagnostics = true;
             continue;
         }
+        if(argument == "--mcp3008") {
+            options.mcp3008 = true;
+            continue;
+        }
         if(i + 1 >= argc)
             throw std::runtime_error("Missing value for " + argument);
 
@@ -153,7 +162,23 @@ Options parse_options(int argc, char** argv) {
             } catch(...) {
                 throw std::runtime_error("Invalid value for --web-port");
             }
-        } else {
+        } else if(argument == "--mcp3008-device") options.mcp3008Device = value;
+        else if(argument == "--mcp3008-channel") {
+            try {
+                size_t used = 0;
+                const auto channel = std::stoul(value, &used);
+                if(used != std::strlen(value) || channel > 7)
+                    throw std::invalid_argument("range");
+                options.mcp3008Channel = static_cast<unsigned int>(channel);
+            } catch(...) {
+                throw std::runtime_error("Invalid value for --mcp3008-channel");
+            }
+        }
+        else if(argument == "--hardware-gain-min")
+            options.hardwareGainMinDb = number<float>(value, argument);
+        else if(argument == "--hardware-gain-max")
+            options.hardwareGainMaxDb = number<float>(value, argument);
+        else {
             throw std::runtime_error("Unknown option: " + argument);
         }
     }
@@ -167,5 +192,9 @@ Options parse_options(int argc, char** argv) {
     if(options.deepFilterAttenuationLimitDb < 0.0f ||
        options.deepFilterAttenuationLimitDb > 100.0f)
         throw std::runtime_error("--deepfilter-atten-limit must be between 0 and 100 dB");
+    if(options.mcp3008Channel > 7)
+        throw std::runtime_error("--mcp3008-channel must be between 0 and 7");
+    if(options.hardwareGainMinDb >= options.hardwareGainMaxDb)
+        throw std::runtime_error("--hardware-gain-min must be less than --hardware-gain-max");
     return options;
 }
