@@ -41,9 +41,10 @@ struct Options {
     bool diagnostics = false;
     Routing routing = Routing::Input2ToStereo;
     unsigned int webPort = 8080;
-    bool mcp3008 = false;
+    bool mcp3008 = true;
     std::string mcp3008Device = "/dev/spidev0.0";
     unsigned int mcp3008Channel = 0;
+    int mcp3008MixChannel = 1;
     float hardwareGainMinDb = -60.0f;
     float hardwareGainMaxDb = 12.0f;
 };

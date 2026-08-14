@@ -48,9 +48,11 @@ void print_usage(const char* name) {
         << "  --deepfilter-delay SAMPLES   Model delay before scheduling buffer (default 1440)\n"
         << "  --routing MODE         stereo, input1, input2, or mix (default input2)\n"
         << "  --web-port PORT        Browser control port (default 8080; 0 disables)\n"
-        << "  --mcp3008              Control output gain from an MCP3008 ADC\n"
+        << "  --mcp3008              Enable MCP3008 controls (default)\n"
+        << "  --no-mcp3008           Disable MCP3008 controls\n"
         << "  --mcp3008-device PATH  SPI device (default /dev/spidev0.0)\n"
         << "  --mcp3008-channel N    ADC channel 0-7 (default 0)\n"
+        << "  --mcp3008-mix-channel N  ADC channel 0-7 for dry/wet (default 1)\n"
         << "  --hardware-gain-min DB Gain at ADC value 0 (default -60)\n"
         << "  --hardware-gain-max DB Gain at ADC value 1023 (default +12)\n"
         << "  --diagnostics          Print negotiated ALSA settings and rate-limited xrun details\n"
@@ -129,6 +131,10 @@ Options parse_options(int argc, char** argv) {
             options.mcp3008 = true;
             continue;
         }
+        if(argument == "--no-mcp3008") {
+            options.mcp3008 = false;
+            continue;
+        }
         if(i + 1 >= argc)
             throw std::runtime_error("Missing value for " + argument);
 
@@ -174,6 +180,17 @@ Options parse_options(int argc, char** argv) {
                 throw std::runtime_error("Invalid value for --mcp3008-channel");
             }
         }
+        else if(argument == "--mcp3008-mix-channel") {
+            try {
+                size_t used = 0;
+                const auto channel = std::stoul(value, &used);
+                if(used != std::strlen(value) || channel > 7)
+                    throw std::invalid_argument("range");
+                options.mcp3008MixChannel = static_cast<int>(channel);
+            } catch(...) {
+                throw std::runtime_error("Invalid value for --mcp3008-mix-channel");
+            }
+        }
         else if(argument == "--hardware-gain-min")
             options.hardwareGainMinDb = number<float>(value, argument);
         else if(argument == "--hardware-gain-max")
@@ -194,6 +211,8 @@ Options parse_options(int argc, char** argv) {
         throw std::runtime_error("--deepfilter-atten-limit must be between 0 and 100 dB");
     if(options.mcp3008Channel > 7)
         throw std::runtime_error("--mcp3008-channel must be between 0 and 7");
+    if(options.mcp3008 && options.mcp3008MixChannel == static_cast<int>(options.mcp3008Channel))
+        throw std::runtime_error("MCP3008 gain and mix controls must use different channels");
     if(options.hardwareGainMinDb >= options.hardwareGainMaxDb)
         throw std::runtime_error("--hardware-gain-min must be less than --hardware-gain-max");
     return options;

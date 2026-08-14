@@ -34,15 +34,33 @@ int main(int argc, char** argv) {
         Pcm playback(options.playbackDevice, SND_PCM_STREAM_PLAYBACK, options);
         Processor processor(options);
         std::unique_ptr<Mcp3008> hardwareGain;
-        float filteredAdc = 0.0f;
-        int lastAppliedAdc = -100;
+        float filteredGainAdc = 0.0f;
+        float filteredMixAdc = 0.0f;
+        int lastAppliedGainAdc = -100;
+        int lastAppliedMixAdc = -100;
         if(options.mcp3008) {
             hardwareGain = std::make_unique<Mcp3008>(options.mcp3008Device);
-            filteredAdc = static_cast<float>(hardwareGain->read(options.mcp3008Channel));
+            filteredGainAdc = static_cast<float>(hardwareGain->read(options.mcp3008Channel));
+            const float initialGainDb = options.hardwareGainMinDb +
+                (filteredGainAdc / 1023.0f) *
+                (options.hardwareGainMaxDb - options.hardwareGainMinDb);
+            processor.set_gain_db(initialGainDb);
+            lastAppliedGainAdc = static_cast<int>(filteredGainAdc + 0.5f);
             std::cout << "Hardware gain: MCP3008 CH" << options.mcp3008Channel
                       << " on " << options.mcp3008Device << " maps "
                       << options.hardwareGainMinDb << " to "
-                      << options.hardwareGainMaxDb << " dB.\n";
+                      << options.hardwareGainMaxDb << " dB; initial ADC "
+                      << lastAppliedGainAdc << " -> " << initialGainDb << " dB.\n";
+            if(options.mcp3008MixChannel >= 0) {
+                filteredMixAdc = static_cast<float>(
+                    hardwareGain->read(static_cast<unsigned int>(options.mcp3008MixChannel)));
+                processor.set_dry_wet(filteredMixAdc / 1023.0f);
+                lastAppliedMixAdc = static_cast<int>(filteredMixAdc + 0.5f);
+                std::cout << "Hardware dry/wet: MCP3008 CH"
+                          << options.mcp3008MixChannel << "; initial ADC "
+                          << lastAppliedMixAdc << " -> "
+                          << (filteredMixAdc / 1023.0f * 100.0f) << "% wet.\n";
+            }
         }
         WebControlServer webControls(options.webPort, processor);
         std::vector<int16_t> samples(options.periodFrames * options.channels);
@@ -56,14 +74,26 @@ int main(int argc, char** argv) {
         while(running) {
             if(hardwareGain) {
                 const int raw = hardwareGain->read(options.mcp3008Channel);
-                filteredAdc += 0.15f * (static_cast<float>(raw) - filteredAdc);
-                const int stableAdc = static_cast<int>(filteredAdc + 0.5f);
-                if(std::abs(stableAdc - lastAppliedAdc) >= 3) {
-                    const float position = filteredAdc / 1023.0f;
+                filteredGainAdc += 0.15f *
+                    (static_cast<float>(raw) - filteredGainAdc);
+                const int stableAdc = static_cast<int>(filteredGainAdc + 0.5f);
+                if(std::abs(stableAdc - lastAppliedGainAdc) >= 3) {
+                    const float position = filteredGainAdc / 1023.0f;
                     const float gainDb = options.hardwareGainMinDb + position *
                         (options.hardwareGainMaxDb - options.hardwareGainMinDb);
                     processor.set_gain_db(gainDb);
-                    lastAppliedAdc = stableAdc;
+                    lastAppliedGainAdc = stableAdc;
+                }
+                if(options.mcp3008MixChannel >= 0) {
+                    const int mixRaw = hardwareGain->read(
+                        static_cast<unsigned int>(options.mcp3008MixChannel));
+                    filteredMixAdc += 0.15f *
+                        (static_cast<float>(mixRaw) - filteredMixAdc);
+                    const int stableMixAdc = static_cast<int>(filteredMixAdc + 0.5f);
+                    if(std::abs(stableMixAdc - lastAppliedMixAdc) >= 3) {
+                        processor.set_dry_wet(filteredMixAdc / 1023.0f);
+                        lastAppliedMixAdc = stableMixAdc;
+                    }
                 }
             }
             snd_pcm_sframes_t frames =
