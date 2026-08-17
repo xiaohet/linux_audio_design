@@ -1,16 +1,12 @@
 # Linux Audio Design
 
-This is a Linux-based project aiming for powerful audio applications on Raspberry Pi. 
+This is a Linux-based project aiming at building audio applications for both speech and music and ready for hardware implementations. This project is meant for implementation on Raspberry Pi with accessories like USB audio interface and audio input devices.
 
-The project provides `audio_project` for offline WAV processing,
-`realtime_audio` for real-time USB audio playback, and
-`deepfilter_benchmark` for native DeepFilterNet timing and listening tests.
+This project provides `realtime_audio` for real-time USB audio playback, as well as `audio_project` for offline WAV processing, and testing executables including `deepfilter_benchmark` for native DeepFilterNet timing and listening tests and `mcp3008_test` for SPI divider testing.
 
-Both executables provide gain processing. `realtime_audio` adds a fully
-parametric peaking EQ, while the offline `audio_project` retains its low-pass
-and high-pass filters.
+The main executable for real-time processing, `realtime_audio`, provides gain processing, parametric peaking EQ, compressor, input routing, and DeepFilterNet-based noise suppression, plus having an interactive webpage-based control panel.
 
-In `audio_project`, an audio wav file reading function and an audio wav file writing function are also used.
+The offline executable for offline processing, `audio_project`, provides gain processing and low-pass and high-pass filters, along with wav file reading and writing schemes.
 
 ## Raspberry Pi 4 real-time USB audio
 
@@ -38,7 +34,7 @@ If the interface appears as card `Device`, start a low-latency stereo pass-throu
   --capture plughw:CARD=Device \
   --playback plughw:CARD=Device \
   --rate 48000 --channels 2 \
-  --period 128 --buffer 512 --gain 0.8
+  --period 128 --buffer 512 --gain -1.9
 ```
 
 Use a stable `CARD=` name from `/proc/asound/cards` instead of a numeric card index, which can change after reboot. The seven-band EQ starts flat. Start with the interface's direct-monitor control off, or you will hear both the dry and processed signals.
