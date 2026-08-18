@@ -1,8 +1,8 @@
 # Linux Audio Design
 
-This is a Linux-based project aiming at building audio applications for both speech and music and ready for hardware implementations. This project is meant for implementation on Raspberry Pi with accessories like USB audio interface and audio input devices.
+This is a Linux-based project aiming at building audio applications for both speech and music and ready for hardware implementations. This project is meant for implementation on Raspberry Pi with accessories including USB audio interface, MCP3008 analog-to-digital converter, and audio input devices.
 
-This project provides `realtime_audio` for real-time USB audio playback, as well as `audio_project` for offline WAV processing, and testing executables including `deepfilter_benchmark` for native DeepFilterNet timing and listening tests and `mcp3008_test` for SPI divider testing.
+This project provides `realtime_audio` for real-time USB audio playback, as well as `audio_project` for offline WAV processing, and testing executables including `deepfilter_benchmark` for native DeepFilterNet timing and listening tests and `mcp3008_test` for MCP3008 SPI divider testing.
 
 The main executable for real-time processing, `realtime_audio`, provides gain processing, parametric peaking EQ, compressor, input routing, and DeepFilterNet-based noise suppression, plus having an interactive webpage-based control panel.
 
@@ -43,47 +43,7 @@ At 48 kHz, a 128-frame period is about 2.7 ms. If ALSA reports overruns or under
 
 Press Ctrl+C to stop. Run `./build/realtime_audio --help` for all options.
 
-### MCP3008 hardware control
-
-The MCP3008 controller reads a 3.3 V-referenced ADC channel and maps
-values 0 through 1023 to output gain from -60 through +12 dB. First verify the
-SPI wiring without starting the audio system:
-
-```bash
-./build/mcp3008_test /dev/spidev0.0 0
-```
-
-CH0 connected through equal 10 kOhm resistors to 3.3 V and ground should read
-approximately 512 (1.65 V). Ground should read approximately 0, and 3.3 V
-approximately 1023. Never apply 5 V to an MCP3008 input connected to the Pi.
-
-MCP3008 control is enabled by default: CH0 controls output gain and CH1 controls
-dry/wet mix. Start the audio program normally:
-
-```bash
-./build/realtime_audio \
-  --capture plughw:CARD=Device \
-  --playback plughw:CARD=Device \
-  --period 128 --buffer 512
-```
-
-The equal-resistor test point produces about -24 dB. The reading is smoothed
-and small ADC changes are ignored to prevent audible gain jitter. A 10 kOhm
-linear potentiometer can later replace the divider: connect its outer terminals
-to 3.3 V and ground and its wiper to CH0. While MCP3008 control is enabled it is
-the authoritative gain source, so browser or terminal gain changes are replaced
-by the next changed hardware reading. The range can be customized with
-`--hardware-gain-min DB` and `--hardware-gain-max DB`; another SPI chip-select
-can be selected with `--mcp3008-device /dev/spidev0.1`.
-
-For hardware dry/wet control, connect a second linear potentiometer with its
-outer terminals at 3.3 V and ground and its wiper at MCP3008 CH1. Enable it with
-the default CH1 setting. ADC 0 is 0% wet (unprocessed signal), ADC 1023 is
-100% wet (fully processed), and the midpoint is approximately 50% wet. Leave
-CH1 connected while using the default configuration; a floating ADC input gives
-random values. Run with `--no-mcp3008` when the ADC or either potentiometer is
-disconnected. The channel assignments can still be changed with
-`--mcp3008-channel N` and `--mcp3008-mix-channel N`.
+### Runtime command control
 
 While audio is streaming, type commands in the same terminal and press Enter:
 
@@ -99,13 +59,31 @@ noise 60
 dfstats
 ```
 
-`gain` sets output gain in decibels, matching the browser control; for example, `gain -6` reduces the level by approximately half and `gain 0` is unity gain. Use `mute` as a diagnostic: if audio is still audible after muting, the USB interface's hardware direct-monitor path is enabled and is bypassing this program.
+`gain` sets output gain in decibels, matching the browser control; for example, `gain -6` reduces the level by approximately half and `gain 0` is unity gain. `mute` sets the gain level to the lowest possible (-60dB). The `mix` command accepts a wet percentage from 0 (fully dry) to 100 (fully effected). The command controls for gain and mix take effect when hardware controls are not enabled.
 
-The real-time graphic EQ uses seven peaking biquads centered at 80, 160, 320, 640, 1280, 2560, and 5120 Hz. Each band has a fixed Q of 1.4 and an independently adjustable gain from -18 to +18 dB. Use `eqoff` to reset every band to 0 dB. The stereo-linked compressor follows the EQ and provides threshold, ratio, attack, release, and makeup-gain controls; its default 1:1 ratio leaves the signal unchanged. The `mix` command accepts a wet percentage from 0 (fully dry) to 100 (fully effected). Output gain is applied after this mix, so it controls both paths equally. Type `help` to display all real-time commands, or `quit` to stop the program. Updates take effect on the next audio period without restarting the ALSA stream.
+The real-time graphic EQ uses seven peaking biquads centered at 80, 160, 320, 640, 1280, 2560, and 5120 Hz. Each band has a fixed Q of 1.4 and an independently adjustable gain from -18 to +18 dB. Use `eqoff` to reset every band to 0 dB. The stereo-linked compressor provides threshold, ratio, attack, release, and makeup-gain controls; its default 1:1 ratio leaves the signal unchanged. 
 
-### Scarlett Solo input routing
+Type `help` to display all real-time commands, or `quit` to stop the program. Updates take effect on the next audio period without restarting the ALSA stream.
 
-The Scarlett Solo exposes its two physical inputs as the two channels of a stereo capture stream. A mono source connected to input 2 therefore appears only on the right channel unless it is routed to both outputs. The default routing is `input2`, which duplicates capture input 2 to the left and right playback channels before applying gain and filters.
+### MCP3008 hardware control
+
+The MCP3008 controller reads 3.3 V-referenced ADC channels and maps values 0 through 1023 to control variables. output gain from -60 through +12 dB. MCP3008 control is enabled by default: CH0 controls output gain (-60 through +12dB) and CH1 controls dry/wet mix (0% through 100%).
+
+First verify the SPI wiring without starting the audio system:
+
+```bash
+./build/mcp3008_test /dev/spidev0.0 0
+```
+
+An analog input (CH0, e.g.) connected through equal 10 kOhm resistors to 3.3 V and ground should read approximately 512 (1.65 V). Ground should read approximately 0, and 3.3 V approximately 1023. Never apply 5 V to an MCP3008 input connected to the Pi.
+
+A linear potentiometer can be used for smooth analog input control: connect its outer terminals to 3.3 V and ground and its wiper to CH0. While MCP3008 control is enabled it is the authoritative gain source, so browser or terminal gain changes are replaced by the next changed hardware reading. The range can be customized with `--hardware-gain-min DB` and `--hardware-gain-max DB`; another SPI chip-select can be selected with `--mcp3008-device /dev/spidev0.1`.
+
+Run with `--no-mcp3008` when the ADC or either potentiometer is disconnected. The channel assignments can still be changed with `--mcp3008-channel N` and `--mcp3008-mix-channel N`.
+
+### USB audio interface input routing
+
+A USB audio interface with two physical inputs (Focusrite Scarlett Solo, e.g.) exposes its inputs as the two channels of a stereo capture stream. A mono source connected to input 2 therefore appears only on the right channel unless it is routed to both outputs. The default routing is `input2`, which duplicates capture input 2 to the left and right playback channels before applying gain and filters.
 
 Change routing while streaming with:
 
@@ -117,18 +95,6 @@ route mix
 ```
 
 `stereo` preserves the two capture channels independently. `mix` averages both inputs and sends that mono mix to both outputs. The startup equivalent is `--routing MODE`.
-
-### Diagnosing ALSA recovery
-
-The playback stream is prefilled to several periods before it starts and after an underrun recovery. This makes the configured buffer an actual scheduling reserve rather than starting playback with only one period queued.
-
-Enable rate-limited ALSA diagnostics when investigating a problem:
-
-```bash
-./build/realtime_audio --diagnostics
-```
-
-The startup output shows the period and buffer sizes ALSA actually negotiated; these can differ from the requested values. During streaming, enter `stats` to print capture/playback state, available frames, delay, and recovery counts. Avoid printing on every audio-loop iteration because terminal I/O can itself cause underruns.
 
 ### Browser control panel
 
@@ -321,6 +287,18 @@ performance test at least three times, including once after the Pi has warmed
 up. Use it as a baseline before enabling the model in `realtime_audio`;
 inference-only success does not prove that USB audio plus the web interface will
 remain underrun-free.
+
+### Diagnosing ALSA recovery
+
+The playback stream is prefilled to several periods before it starts and after an underrun recovery. This makes the configured buffer an actual scheduling reserve rather than starting playback with only one period queued.
+
+Enable rate-limited ALSA diagnostics when investigating a problem:
+
+```bash
+./build/realtime_audio --diagnostics
+```
+
+The startup output shows the period and buffer sizes ALSA actually negotiated; these can differ from the requested values. During streaming, enter `stats` to print capture/playback state, available frames, delay, and recovery counts. Avoid printing on every audio-loop iteration because terminal I/O can itself cause underruns.
 
 ### Real-time source layout
 
