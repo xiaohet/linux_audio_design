@@ -10,13 +10,20 @@ The offline executable for offline processing, `audio_project`, provides gain pr
 
 ## Raspberry Pi 4 real-time USB audio
 
-Connect the phone's analog output to the USB interface input, and connect headphones or speakers to the interface output. On Raspberry Pi OS (64-bit recommended), install the build dependencies and compile:
+Connect the analog output of the input device (phone, e.g.) to the USB interface input, and connect headphones or speakers to the interface output. On Raspberry Pi OS (64-bit recommended), install the build dependencies and compile:
 
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake pkg-config libasound2-dev alsa-utils
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
+```
+
+Run `realtime_audio` from the repository root so those relative paths resolve:
+
+```bash
+cd "$HOME/linux_audio_design_pi"
+./build/realtime_audio
 ```
 
 Find the USB interface's ALSA PCM name:
@@ -98,36 +105,25 @@ route mix
 
 ### Browser control panel
 
-The real-time executable includes a responsive browser interface—no separate web server or JavaScript runtime is required. Start the audio engine normally, then open the following address from a phone or computer on the same network:
+The `realtime_audio` executable includes a responsive browser interface—no separate web server or JavaScript runtime is required. Start the audio engine normally, then open the following address from a phone or computer on the same network:
 
 ```text
 http://raspberrypi.local:8080
 ```
 
-The compact top row places input routing, output gain, dry/wet, and noise suppression on the left, with a separate single-column compressor card on its right. Seven compact graphic-EQ faders sit below, with a smaller vertical output peak meter on the far right. A live gain-reduction readout shows when the compressor is working. The dry/wet slider continuously blends the routed dry signal with the gate, EQ, and compressor processed signal. Terminal controls continue to work at the same time. Use another port with `--web-port PORT`, or disable the web interface with `--web-port 0`.
+The compact top-left section places input routing, output gain, dry/wet, and noise suppression on the left, and a separate single-column compressor card is placed on its right with a live gain-reduction readout at the top-right of this section. Seven graphic-EQ faders sit below, with a vertical output peak meter on the far right. The dry/wet slider blends the routed dry signal with the gate, EQ, and compressor processed signal. Terminal controls continue to work at the same time. Use another port with `--web-port PORT`, or disable the web interface with `--web-port 0`.
 
-The Noise suppression slider is independent of the effects dry/wet slider. Zero is
-off; higher values blend in more DeepFilterNet output. DeepFilterNet is a speech
-enhancement model, so start around 10–30% for guitar and 60–100% for noisy voice.
+The Noise suppression slider is independent of the effects dry/wet slider. Zero value disables the DeepFilterNet-controlled noise suppression. Higher values blend in more DeepFilterNet output. DeepFilterNet is a speech enhancement model, so start around 60–100% for noisy voice and 0–30% for instruments.
 
 If `raspberrypi.local` does not resolve, use the address printed by `hostname -I`, for example `http://192.168.1.50:8080`. The control page is available to devices on the local network and does not include authentication, so use it only on a trusted network.
 
 ### Real-time DeepFilterNet integration
 
-The real-time program optionally loads the DeepFilterNet v0.5.6 C API at runtime.
-When this repository contains the tested DeepFilterNet checkout, the default paths
-are:
+The real-time program optionally loads the DeepFilterNet v0.5.6 C API at runtime. When this repository contains the tested DeepFilterNet checkout, the default paths are:
 
 ```text
 DeepFilterNet/target/aarch64-unknown-linux-gnu/release/libdeepfilter.so
 DeepFilterNet/models/DeepFilterNet3_onnx.tar.gz
-```
-
-Run `realtime_audio` from the repository root so those relative paths resolve:
-
-```bash
-cd "$HOME/linux_audio_design_pi"
-./build/realtime_audio
 ```
 
 If they are not present there, the program also checks the same paths below
@@ -269,7 +265,7 @@ vcgencmd get_throttled
 
 The executable returns status `0` for a conservative pass, `2` when the measurements need review, and `1` for a setup/runtime error. A pass requires average RTF below 0.60, 99th-percentile processing below 80% of the model frame deadline, and zero deadline misses. The full report includes model initialization time, mean/median/p95/p99/maximum frame times, RTF, deadline misses, process CPU use, peak resident memory, and Pi temperature when the Linux thermal sensor is available. `vcgencmd get_throttled` should report `0x0`; otherwise fix power or cooling before trusting the result.
 
-For a listening test, prepare a conventional 48 kHz, 16-bit PCM WAV containing voice, guitar, or recorded noise. Keep this run short and write the enhanced mono result:
+For a listening test, prepare a conventional 48 kHz, 16-bit PCM WAV containing voice, instruments, or recorded noise. Keep this run short and write the enhanced mono result:
 
 ```bash
 ./build/deepfilter_benchmark \
@@ -281,7 +277,7 @@ For a listening test, prepare a conventional 48 kHz, 16-bit PCM WAV containing v
   --csv deepfilter_listening.csv
 ```
 
-Listen specifically for removed guitar sustain or harmonics, watery artifacts,
+Listen specifically for removed instrumental sustain or harmonics, watery artifacts,
 damaged pick transients, and changes to voice intelligibility. Repeat the long
 performance test at least three times, including once after the Pi has warmed
 up. Use it as a baseline before enabling the model in `realtime_audio`;
@@ -314,18 +310,3 @@ The real-time application is divided by responsibility:
 - `src/deepfilter_benchmark.cpp`: standalone native DeepFilterNet performance and listening benchmark
 
 Each module's public classes and structures are declared in the matching header under `include/`.
-
-### Diagnosing noise from a disconnected or sleeping phone
-
-Use the terminal command `levels` while testing the cable disconnected, the phone screen off, and the phone screen on. It reports the peak captured on each Scarlett input before routing or DSP, followed by the processed output peak. If the affected input level rises when the Lightning adapter sleeps, the noise is entering through the analog input rather than being generated by the filters.
-
-The input noise gate defaults to `-55` dBFS. Set its threshold just above the measured idle-noise level:
-
-```text
-levels
-gate -45
-```
-
-For example, if the unwanted input measures around `-50` dBFS, begin with `gate -45`. Use `gate off` to disable it. A higher threshold suppresses more noise but can also mute quiet music, so hardware correction is preferable.
-
-For a phone source, use the Scarlett input in line mode with Inst disabled and keep the hardware input gain only as high as required. Do not connect a stereo phone output directly to a balanced mono input with a simple TRS-to-TRS adapter; use a stereo breakout, a properly resistor-summed mono cable, or a stereo DI/isolator intended for this connection.
