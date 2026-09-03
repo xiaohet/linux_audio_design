@@ -188,7 +188,7 @@ async function load(){
 	  try{const s=await(await fetch('/api/state')).json();gain.value=s.gainDb;dryWet.value=s.dryWet*100;noise.value=s.noiseSuppression*100;noise.disabled=!s.deepFilterAvailable;$('noiseBlock').style.opacity=s.deepFilterAvailable?'1':'.45';eqGains.forEach((control,i)=>control.value=s.eqGains[i]);compThreshold.value=s.compThreshold;compRatio.value=s.compRatio;compAttack.value=s.compAttack;compRelease.value=s.compRelease;compMakeup.value=s.compMakeup;routing.value=s.routing;showPeak(s.peak);showDf(s);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction';labels();status.textContent='Live';status.className='status online'}
   catch{status.textContent='Disconnected';status.className='status'}
 }
-	async function meter(){try{const s=await(await fetch('/api/state')).json();showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction'}catch{}}
+	async function meter(){try{const s=await(await fetch('/api/state')).json();gain.value=s.gainDb;dryWet.value=s.dryWet*100;$('gainValue').textContent=(+gain.value).toFixed(1)+' dB';$('dryWetValue').textContent=Math.round(+dryWet.value)+'% wet';showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction'}catch{}}
 load();setInterval(load,5000);setInterval(meter,90);
 </script></body></html>)HTML";
 }
