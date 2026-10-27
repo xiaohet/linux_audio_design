@@ -15,6 +15,9 @@
 #include <memory>
 #include <stdexcept>
 #include <vector>
+#include <thread>
+#include <chrono>
+#include <mutex>
 
 namespace {
 std::atomic<bool> running{true};
@@ -22,6 +25,29 @@ std::atomic<bool> running{true};
 void stop(int) {
     running = false;
 }
+
+class TerminalControls {
+public:
+    TerminalControls(Processor& processor, const Pcm& capture, const Pcm& playback,
+                     AudioTransport& transport)
+        : worker_([this, &processor, &capture, &playback, &transport] {
+            while(!stop_ && running) {
+                RecoveryStats snapshot;
+                { std::lock_guard<std::mutex> lock(mutex_); snapshot = stats_; }
+                if(!handle_control_input(processor,capture,playback,snapshot,transport)) running=false;
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }) {}
+    ~TerminalControls() { stop_=true; worker_.join(); }
+    void publish(const RecoveryStats& stats) {
+        std::lock_guard<std::mutex> lock(mutex_); stats_=stats;
+    }
+private:
+    std::mutex mutex_;
+    RecoveryStats stats_;
+    std::atomic<bool> stop_{false};
+    std::thread worker_;
+};
 }
 
 int main(int argc, char** argv) {
@@ -62,7 +88,8 @@ int main(int argc, char** argv) {
                           << (filteredMixAdc / 1023.0f * 100.0f) << "% wet.\n";
             }
         }
-        WebControlServer webControls(options.webPort, processor);
+        AudioTransport transport(options.rate, options.channels, DEFAULT_DATA_DIR);
+        WebControlServer webControls(options.webPort, processor, transport);
         std::vector<int16_t> samples(options.periodFrames * options.channels);
         RecoveryStats recoveries;
 
@@ -70,6 +97,7 @@ int main(int argc, char** argv) {
                   << " channels. Press Ctrl+C to stop.\n";
         print_control_help();
         processor.print_status();
+        TerminalControls terminal(processor,capture,playback,transport);
 
         while(running) {
             if(hardwareGain) {
@@ -106,6 +134,7 @@ int main(int argc, char** argv) {
             }
 
             processor.process(samples, frames);
+            transport.process(samples.data(), static_cast<size_t>(frames));
             snd_pcm_sframes_t written = 0;
             while(written < frames && running) {
                 const auto result = snd_pcm_writei(
@@ -123,10 +152,7 @@ int main(int argc, char** argv) {
                 written += result;
             }
 
-            if(!handle_control_input(processor, capture, playback,
-                                     recoveries)) {
-                running = false;
-            }
+            terminal.publish(recoveries);
         }
 
         snd_pcm_drop(capture.get());

@@ -72,6 +72,58 @@ The real-time graphic EQ uses seven peaking biquads centered at 80, 160, 320, 64
 
 Type `help` to display all real-time commands, or `quit` to stop the program. Updates take effect on the next audio period without restarting the ALSA stream.
 
+### Recording and WAV playback
+
+Use these commands in the terminal running `realtime_audio` (including a VS Code
+SSH terminal on the Pi):
+
+```text
+record
+stop
+files
+play record0000.wav
+playstop
+```
+
+`record` captures the processed output after routing, noise suppression, EQ,
+compression, dry/wet mix, and output gain. `stop` drains the recording buffer and
+finalizes a 16-bit PCM WAV at the current stream sample rate and channel count.
+The first unused name from `record0000.wav` through `record9999.wav` is selected;
+existing recordings are preserved. Files are saved in the repository's `data/`
+directory, whose absolute location is set when CMake configures the Pi build.
+Reconfigure/rebuild after moving the project to another location. Normal exit
+with `quit` or Ctrl+C also finalizes an active recording.
+
+`files` lists all `.wav` files in `data/`, including names that do not start with
+`record` and uppercase `.WAV` extensions. `play FILENAME` accepts the entire
+remaining line as the filename, so spaces need no quotation marks. Playback
+preserves the original file audio, bypasses the effects and output-gain control,
+and mixes it with the live processed input. Summed peaks are clipped to the
+16-bit output range. Playback ends automatically; `playstop` stops it early.
+Recording and WAV playback are mutually exclusive in both terminal and browser
+controls. Stop the active operation before starting the other.
+
+The browser has a Record/Stop button, WAV selector, and Play button in a single
+card beside “Sound shaping.” above the compressor and output meter. The file
+list refreshes every five seconds and immediately after recording stops.
+Recording disables Play and the selector; playback disables Record and Play.
+
+Playback supports mono/stereo PCM WAVs at 8, 16, 24, or 32 bits, and 32-bit IEEE
+float WAVs. Sample rates are converted to the running stream rate using linear
+interpolation; mono files are duplicated to stereo and stereo files are averaged
+for mono output. Compressed and extensible WAV encodings are rejected with an
+error. Playback is decoded into memory before starting, with a 256 MiB decoded
+sample limit. Recording uses a four-second memory ring and a disk writer thread;
+disk errors, ring overflow, and the RIFF 4 GiB limit are reported instead of
+silently dropping samples. Terminal file operations run separately from the
+audio loop. A force kill or power loss cannot finalize a WAV header.
+
+Run the portable recording/playback tests after building:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
 ### MCP3008 hardware control
 
 The MCP3008 controller reads 3.3 V-referenced ADC channels and maps values 0 through 1023 to control variables. output gain from -60 through +12 dB. MCP3008 control is enabled by default: CH0 controls output gain (-60 through +12dB) and CH1 controls dry/wet mix (0% through 100%).
@@ -110,6 +162,10 @@ The `realtime_audio` executable includes a responsive browser interface—no sep
 ```text
 http://raspberrypi.local:8080
 ```
+
+The output-gain and dry/wet displays follow their MCP3008 potentiometers using
+the same fast state refresh as the output meter, so hardware changes normally
+appear in the browser within about one refresh interval plus ADC smoothing.
 
 The compact top-left section places input routing, output gain, dry/wet, and noise suppression on the left, and a separate single-column compressor card is placed on its right with a live gain-reduction readout at the top-right of this section. Seven graphic-EQ faders sit below, with a vertical output peak meter on the far right. The dry/wet slider blends the routed dry signal with the gate, EQ, and compressor processed signal. Terminal controls continue to work at the same time. Use another port with `--web-port PORT`, or disable the web interface with `--web-port 0`.
 

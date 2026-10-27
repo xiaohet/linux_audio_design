@@ -15,8 +15,37 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-WebControlServer::WebControlServer(unsigned int port, Processor& processor)
-    : port_(port), processor_(processor) {
+namespace {
+std::string json_string(const std::string& value) {
+    std::string result = "\"";
+    const char* hex = "0123456789abcdef";
+    for(unsigned char c : value) {
+        if(c == '"' || c == '\\') { result += '\\'; result += c; }
+        else if(c < 32) { result += "\\u00"; result += hex[c >> 4]; result += hex[c & 15]; }
+        else result += c;
+    }
+    return result + '"';
+}
+std::string url_decode(const std::string& value) {
+    std::string result;
+    for(size_t i=0; i<value.size(); ++i) {
+        if(value[i]=='+') result+=' ';
+        else if(value[i]=='%') {
+            if(i+2>=value.size()) throw std::runtime_error("Invalid URL encoding");
+            const auto digits=value.substr(i+1,2);
+            if(digits.find_first_not_of("0123456789abcdefABCDEF")!=std::string::npos)
+                throw std::runtime_error("Invalid URL encoding");
+            const char c=static_cast<char>(std::stoul(digits,nullptr,16));
+            if(!c) throw std::runtime_error("Invalid filename");
+            result+=c; i+=2;
+        } else result+=value[i];
+    }
+    return result;
+}
+}
+
+WebControlServer::WebControlServer(unsigned int port, Processor& processor, AudioTransport& transport)
+    : port_(port), processor_(processor), transport_(transport) {
     if(port_ == 0) return;
 
     listener_ = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -76,11 +105,12 @@ select{width:100%;background:#111610;color:var(--text);border:1px solid var(--li
 .utility{display:none}.peak-card{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;align-items:center}.peak-card .row{width:100%;flex-direction:column;align-items:center;gap:1px;text-align:center;margin-bottom:8px}.peak-card .label{font-size:.72rem}.peak-card .value{font-size:.72rem}.meter-stack{display:flex;flex:1;min-height:285px;max-height:500px;align-items:stretch;gap:6px}.meter{width:24px;background:#0c100c;border:1px solid var(--line);border-radius:5px;overflow:hidden;display:flex;align-items:flex-end}.meter span{display:block;width:100%;height:0;background:linear-gradient(0deg,var(--accent2) 0 72%,#f4d35e 86%,#ff5c5c 100%);transition:height 70ms linear}
 .scale{display:flex;flex-direction:column;justify-content:space-between;color:var(--muted);font:600 .68rem ui-monospace,monospace;padding:1px 0}
 footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
+.transport{display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:470px;margin-top:25px}.transport select{flex:1;min-width:100px;width:170px;padding:8px;font-size:.8rem}.transport button{background:var(--accent);color:#111610;border:0;border-radius:8px;padding:9px 12px;font-weight:750;cursor:pointer}.transport button:disabled,.transport select:disabled{opacity:.4;cursor:default}.transport small{flex-basis:100%;margin:0;font-size:.68rem}.header-left{flex-shrink:0}header{gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.status{font-size:.72rem;padding:5px 8px}
 @media(max-width:700px){main{width:min(640px,calc(100% - 12px))}.console{grid-template-columns:minmax(430px,1fr) 94px;overflow-x:auto}.top-row{grid-template-columns:minmax(230px,1.1fr) minmax(180px,.9fr)}.vertical-slider{height:155px!important}.eq-card{height:220px}.meter-stack{min-height:260px}}
 </style>
 </head>
 <body><main>
-<header><div><div class="eyebrow">Raspberry Pi · USB Audio</div><h2>Sound shaping.</h2></div><div id="status" class="status">Connecting…</div></header>
+<header><div class="header-left"><div class="eyebrow">Raspberry Pi · USB Audio</div><h2>Sound shaping.</h2></div><div class="card transport" aria-label="Recording and playback"><button id="record" disabled>Record</button><select id="wavFiles" aria-label="WAV file" disabled></select><button id="play" disabled>Play</button><small id="mediaStatus" role="status">Loading WAV files…</small></div><div id="status" class="status">Connecting…</div></header>
 <section class="console">
   <div class="top-row">
   <div class="card controls-card">
@@ -172,6 +202,11 @@ footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
 </main>
 <script>
 const $=id=>document.getElementById(id);
+let media={recording:false,playing:false},mediaPending=false,mediaActionError="";
+function showMedia(s){media=s;$('record').textContent=s.recording?'Stop':'Record';$('record').disabled=mediaPending||s.playing;$('play').disabled=mediaPending||s.recording||s.playing||!$('wavFiles').value;$('wavFiles').disabled=mediaPending||s.recording||s.playing;$('mediaStatus').textContent=mediaActionError||s.mediaError||(s.recording?'Recording '+s.mediaFile:s.playing?'Playing '+s.mediaFile:'Ready · WAV playback mixes with live input')}
+async function loadFiles(){try{const r=await fetch('/api/files');if(!r.ok)throw Error('Cannot list WAV files');const names=await r.json(),selected=$('wavFiles').value;$('wavFiles').replaceChildren(...names.map(name=>new Option(name,name)));if(names.includes(selected))$('wavFiles').value=selected;showMedia(media)}catch(e){$('mediaStatus').textContent=e.message}}
+async function transport(action){mediaActionError="";mediaPending=true;showMedia(media);try{const q=new URLSearchParams({action,file:$('wavFiles').value}),r=await fetch('/api/transport?'+q),s=await r.json();if(!r.ok)throw Error(s.error);mediaPending=false;showMedia(s);await loadFiles()}catch(e){mediaPending=false;mediaActionError=e.message;showMedia(media)}}
+$('record').onclick=()=>transport(media.recording?'stop':'record');$('play').onclick=()=>transport('play');$('wavFiles').onchange=()=>showMedia(media);
 	const gain=$('gain'),dryWet=$('dryWet'),noise=$('noise'),eqGains=[0,1,2,3,4,5,6].map(i=>$('eq'+i)),compThreshold=$('compThreshold'),compRatio=$('compRatio'),compAttack=$('compAttack'),compRelease=$('compRelease'),compMakeup=$('compMakeup'),routing=$('routing'),status=$('status'),peakBar=$('peakBar'),peakValue=$('peakValue');
 let timer;
 	function labels(){$('gainValue').textContent=(+gain.value).toFixed(1)+' dB';$('dryWetValue').textContent=Math.round(+dryWet.value)+'% wet';$('noiseValue').textContent=+noise.value===0?'Off':Math.round(+noise.value)+'%';eqGains.forEach((control,i)=>$('eq'+i+'Value').textContent=(+control.value).toFixed(1)+' dB');$('compThresholdValue').textContent=(+compThreshold.value).toFixed(1)+' dB';$('compRatioValue').textContent=(+compRatio.value).toFixed(1)+':1';$('compAttackValue').textContent=(+compAttack.value).toFixed(1)+' ms';$('compReleaseValue').textContent=Math.round(+compRelease.value)+' ms';$('compMakeupValue').textContent=(+compMakeup.value).toFixed(1)+' dB'}
@@ -188,8 +223,8 @@ async function load(){
 	  try{const s=await(await fetch('/api/state')).json();gain.value=s.gainDb;dryWet.value=s.dryWet*100;noise.value=s.noiseSuppression*100;noise.disabled=!s.deepFilterAvailable;$('noiseBlock').style.opacity=s.deepFilterAvailable?'1':'.45';eqGains.forEach((control,i)=>control.value=s.eqGains[i]);compThreshold.value=s.compThreshold;compRatio.value=s.compRatio;compAttack.value=s.compAttack;compRelease.value=s.compRelease;compMakeup.value=s.compMakeup;routing.value=s.routing;showPeak(s.peak);showDf(s);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction';labels();status.textContent='Live';status.className='status online'}
   catch{status.textContent='Disconnected';status.className='status'}
 }
-	async function meter(){try{const s=await(await fetch('/api/state')).json();gain.value=s.gainDb;dryWet.value=s.dryWet*100;$('gainValue').textContent=(+gain.value).toFixed(1)+' dB';$('dryWetValue').textContent=Math.round(+dryWet.value)+'% wet';showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction'}catch{}}
-load();setInterval(load,5000);setInterval(meter,90);
+		async function meter(){try{const s=await(await fetch('/api/state')).json();showMedia(s);gain.value=s.gainDb;dryWet.value=s.dryWet*100;$('gainValue').textContent=(+gain.value).toFixed(1)+' dB';$('dryWetValue').textContent=Math.round(+dryWet.value)+'% wet';showPeak(s.peak);$('compReduction').textContent=(-s.compReduction).toFixed(1)+' dB reduction'}catch{$('record').disabled=true;$('play').disabled=true}}
+load();loadFiles();setInterval(loadFiles,5000);setInterval(load,5000);setInterval(meter,90);
 </script></body></html>)HTML";
 }
 
@@ -203,7 +238,7 @@ WebControlServer::query_parameters(const std::string& target) {
     while(std::getline(pairs, pair, '&')) {
         const size_t equals = pair.find('=');
         if(equals != std::string::npos)
-            result[pair.substr(0, equals)] = pair.substr(equals + 1);
+            result[pair.substr(0, equals)] = url_decode(pair.substr(equals + 1));
     }
     return result;
 }
@@ -212,7 +247,12 @@ std::string WebControlServer::state_json() const {
     const auto state = processor_.snapshot();
     const float gainDb = state.gain > 0 ? 20.0f * std::log10(state.gain) : -120.0f;
     std::ostringstream json;
-    json << "{\"gainDb\":" << gainDb << ",\"eqGains\":[";
+    const auto media = transport_.state();
+    json << "{\"recording\":" << (media.recording ? "true" : "false")
+         << ",\"playing\":" << (media.playing ? "true" : "false")
+         << ",\"mediaFile\":" << json_string(media.file)
+         << ",\"mediaError\":" << json_string(media.error)
+         << ",\"gainDb\":" << gainDb << ",\"eqGains\":[";
     for(size_t band = 0; band < Processor::EqBandCount; ++band) {
         if(band > 0) json << ',';
         json << state.eqGainsDb[band];
@@ -350,6 +390,28 @@ void WebControlServer::handle(int client) {
         send_response(client, "200 OK", "text/html; charset=utf-8", page());
     } else if(target == "/api/state") {
         send_response(client, "200 OK", "application/json", state_json());
+    } else if(target == "/api/files" || target.rfind("/api/transport?", 0) == 0) {
+        try {
+            if(target == "/api/files") {
+                std::string body = "[";
+                for(const auto& name : transport_.files()) {
+                    if(body.size()>1) body += ',';
+                    body += json_string(name);
+                }
+                send_response(client,"200 OK","application/json",body+"]");
+            } else {
+                const auto parameters=query_parameters(target);
+                const auto action=parameters.at("action");
+                if(action=="record") transport_.record();
+                else if(action=="stop") transport_.stop_recording();
+                else if(action=="play") transport_.play(parameters.at("file"));
+                else if(action=="playstop") transport_.stop_playback();
+                else throw std::runtime_error("Unknown transport action");
+                send_response(client,"200 OK","application/json",state_json());
+            }
+        } catch(const std::exception& error) {
+            send_response(client,"400 Bad Request","application/json","{\"error\":"+json_string(error.what())+"}");
+        }
     } else if(target.rfind("/api/set?", 0) == 0) {
         try {
             apply(query_parameters(target));

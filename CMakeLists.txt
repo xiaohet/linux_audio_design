@@ -5,6 +5,15 @@ project(AudioProject)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(CTest)
+if(BUILD_TESTING)
+    find_package(Threads REQUIRED)
+    add_executable(audio_transport_test src/audio_transport.cpp tests/audio_transport_test.cpp)
+    target_include_directories(audio_transport_test PRIVATE include)
+    target_link_libraries(audio_transport_test PRIVATE Threads::Threads)
+    add_test(NAME audio_transport COMMAND audio_transport_test)
+endif()
+
 include_directories(
     include
 )
@@ -32,6 +41,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_executable(realtime_audio
         src/realtime_audio.cpp
         src/audio_config.cpp
+        src/audio_transport.cpp
         src/command_interface.cpp
         src/deepfilter_processor.cpp
         src/mcp3008.cpp
@@ -40,6 +50,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/web_control_server.cpp
     )
     target_link_libraries(realtime_audio PRIVATE PkgConfig::ALSA Threads::Threads ${CMAKE_DL_LIBS})
+    target_compile_definitions(realtime_audio PRIVATE DEFAULT_DATA_DIR="${CMAKE_SOURCE_DIR}/data")
     target_compile_options(realtime_audio PRIVATE -Wall -Wextra -Wpedantic)
 
     add_executable(mcp3008_test

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "realtime_processor.h"
+#include "audio_transport.h"
 
 #include <atomic>
 #include <map>
@@ -9,7 +10,7 @@
 
 class WebControlServer {
 public:
-    WebControlServer(unsigned int port, Processor& processor);
+    WebControlServer(unsigned int port, Processor& processor, AudioTransport& transport);
     ~WebControlServer();
 
     WebControlServer(const WebControlServer&) = delete;
@@ -28,6 +29,7 @@ private:
 
     unsigned int port_;
     Processor& processor_;
+    AudioTransport& transport_;
     int listener_ = -1;
     std::atomic<bool> stop_{false};
     std::thread worker_;

@@ -25,6 +25,11 @@ void print_control_help() {
         << "  dfstats                Show DeepFilterNet timing and FIFO counters\n"
         << "  route MODE             stereo, input1, input2, or mix\n"
         << "  status                  Show current processing parameters\n"
+        << "  record                  Start recording processed output\n"
+        << "  stop                    Stop recording and save WAV\n"
+        << "  files                   List WAV files in data\n"
+        << "  play FILENAME           Play original WAV mixed with live input\n"
+        << "  playstop                Stop WAV playback\n"
         << "  levels                  Show pre-DSP input and output peak levels\n"
         << "  stats                   Show ALSA state and recovery counters\n"
         << "  help                    Show these commands\n"
@@ -33,16 +38,46 @@ void print_control_help() {
 
 bool handle_control_input(Processor& processor, const Pcm& capture,
                           const Pcm& playback,
-                          const RecoveryStats& recoveries) {
-    pollfd input{STDIN_FILENO, POLLIN, 0};
-    if(poll(&input, 1, 0) <= 0 || !(input.revents & POLLIN)) return true;
-
-    std::string line;
-    if(!std::getline(std::cin, line)) return true;
+                          const RecoveryStats& recoveries, AudioTransport& transport) {
+    // Accumulate available bytes without blocking shutdown on a partial pipe line.
+    static std::string pending;
+    if(pending.find('\n') == std::string::npos) {
+        pollfd input{STDIN_FILENO, POLLIN, 0};
+        if(poll(&input, 1, 0) <= 0 || !(input.revents & POLLIN)) return true;
+        char buffer[4096];
+        const auto count = ::read(STDIN_FILENO,buffer,sizeof(buffer));
+        if(count <= 0) return true;
+        pending.append(buffer,static_cast<size_t>(count));
+        if(pending.size() > 65536) { pending.clear(); return true; }
+    }
+    const auto newline = pending.find('\n');
+    if(newline == std::string::npos) return true;
+    std::string line = pending.substr(0,newline);
+    pending.erase(0,newline+1);
+    if(!line.empty() && line.back()=='\r') line.pop_back();
     std::istringstream commandLine(line);
     std::string command;
     commandLine >> command;
     if(command.empty()) return true;
+
+    if(command == "record" || command == "stop" || command == "files" ||
+       command == "play" || command == "playstop") {
+        try {
+            std::string argument;
+            std::getline(commandLine >> std::ws, argument);
+            if(command != "play" && !argument.empty())
+                throw std::runtime_error("This command takes no arguments");
+            if(command == "record") std::cout << "Recording " << transport.record() << '\n';
+            else if(command == "stop") std::cout << "Saved " << transport.stop_recording() << '\n';
+            else if(command == "files") {
+                const auto names = transport.files();
+                if(names.empty()) std::cout << "No WAV files in data.\n";
+                for(const auto& name : names) std::cout << name << '\n';
+            } else if(command == "play") { transport.play(argument); std::cout << "Playing " << argument << '\n'; }
+            else transport.stop_playback();
+        } catch(const std::exception& error) { std::cerr << error.what() << '\n'; }
+        return true;
+    }
 
     if(command == "quit" || command == "q") return false;
     if(command == "help") {
