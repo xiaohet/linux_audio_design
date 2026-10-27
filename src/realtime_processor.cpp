@@ -77,7 +77,8 @@ Processor::Processor(const Options& options)
 
 Processor::~Processor() = default;
 
-void Processor::process(std::vector<int16_t>& samples, snd_pcm_sframes_t frames) {
+void Processor::process(std::vector<int16_t>& samples, snd_pcm_sframes_t frames,
+                        const int16_t* effectsPlayback) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     float input1BlockPeak = 0.0f;
@@ -95,6 +96,13 @@ void Processor::process(std::vector<int16_t>& samples, snd_pcm_sframes_t frames)
     input2Peak_ = std::max(input2BlockPeak, input2Peak_ * 0.92f);
 
     apply_routing(samples, frames);
+    // File channels are already mapped to the output channels: input routing
+    // affects only the live capture. Both signals then share the effects chain.
+    if(effectsPlayback) {
+        for(size_t i=0; i<static_cast<size_t>(frames)*channels_; ++i)
+            samples[i] = static_cast<int16_t>(std::clamp(
+                int(samples[i])+int(effectsPlayback[i]), -32768, 32767));
+    }
     if(deepFilter_)
         deepFilter_->process(samples, static_cast<size_t>(frames), channels_, routing_);
     const size_t count = static_cast<size_t>(frames) * channels_;

@@ -106,11 +106,30 @@ select{width:100%;background:#111610;color:var(--text);border:1px solid var(--li
 .scale{display:flex;flex-direction:column;justify-content:space-between;color:var(--muted);font:600 .68rem ui-monospace,monospace;padding:1px 0}
 footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
 .transport{display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:470px;margin-top:25px}.transport select{flex:1;min-width:100px;width:170px;padding:8px;font-size:.8rem}.transport button{background:var(--accent);color:#111610;border:0;border-radius:8px;padding:9px 12px;font-weight:750;cursor:pointer}.transport button:disabled,.transport select:disabled{opacity:.4;cursor:default}.transport small{flex-basis:100%;margin:0;font-size:.68rem}.header-left{flex-shrink:0}header{gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.status{font-size:.72rem;padding:5px 8px}
+.header-tools{display:flex;align-items:center;gap:8px;align-self:flex-start;margin-left:auto}.icon-button{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;padding:8px!important;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;cursor:pointer}.icon-button svg{width:22px;height:22px;fill:currentColor}.icon-button:focus-visible,button:focus-visible{outline:2px solid var(--accent2);outline-offset:3px}#record[aria-pressed=true]{background:#ff6767}
+dialog{width:min(480px,calc(100% - 24px));max-height:90vh;overflow:auto;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:22px;box-shadow:0 20px 80px #0009}dialog::backdrop{background:#0009}dialog h2{margin:0 0 18px}dialog label{display:block;margin:14px 0 5px;font-size:.85rem;font-weight:700}dialog input[type=text]{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit}dialog select{padding:10px;font-size:.85rem}.dialog-actions,.directory-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}dialog button{padding:9px 13px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer}dialog button[type=submit]{background:var(--accent);color:#111610;font-weight:750}dialog p,dialog small{font-size:.78rem;color:var(--muted)}#settingsError{color:#ff9090;min-height:1.2em}#directoryBrowser{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:12px}#directoryLocation{overflow-wrap:anywhere;margin:4px 0 8px}#directoryEntries{display:grid;gap:5px;max-height:150px;overflow:auto}#directoryEntries button{text-align:left;overflow-wrap:anywhere}button:disabled{opacity:.45;cursor:default}
 @media(max-width:700px){main{width:min(640px,calc(100% - 12px))}.console{grid-template-columns:minmax(430px,1fr) 94px;overflow-x:auto}.top-row{grid-template-columns:minmax(230px,1.1fr) minmax(180px,.9fr)}.vertical-slider{height:155px!important}.eq-card{height:220px}.meter-stack{min-height:260px}}
 </style>
 </head>
 <body><main>
-<header><div class="header-left"><div class="eyebrow">Raspberry Pi · USB Audio</div><h2>Sound shaping.</h2></div><div class="card transport" aria-label="Recording and playback"><button id="record" disabled>Record</button><select id="wavFiles" aria-label="WAV file" disabled></select><button id="play" disabled>Play</button><small id="mediaStatus" role="status">Loading WAV files…</small></div><div id="status" class="status">Connecting…</div></header>
+<header><div class="header-left"><div class="eyebrow">Raspberry Pi · USB Audio</div><h2>Sound shaping.</h2></div><div class="card transport" aria-label="Recording and playback"><button id="record" class="icon-button" aria-label="Start recording" title="Start recording" aria-pressed="false" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg></button><select id="wavFiles" aria-label="WAV file" disabled></select><button id="play" class="icon-button" aria-label="Play selected WAV" title="Play selected WAV" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4v16l15-8z"/></svg></button><small id="mediaStatus" role="status">Loading WAV files…</small></div><div class="header-tools"><div id="status" class="status">Connecting…</div><button id="settingsButton" class="icon-button" aria-label="Recording and playback settings" title="Settings"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 2h6l.7 3 2 .9 2.8-.9 3 5.2-2.2 2.1v2.3l2.2 2.1-3 5.2-2.8-.9-2 .9-.7 3H9l-.7-3-2-.9-2.8.9-3-5.2 2.2-2.1v-2.3L.5 10.2l3-5.2 2.8.9 2-.9z" transform="translate(1 0) scale(.92)"/><circle cx="12" cy="12" r="3.5" fill="var(--panel)"/></svg></button></div></header>
+<dialog id="settingsDialog" aria-labelledby="settingsTitle">
+  <form id="settingsForm">
+    <h2 id="settingsTitle">Recording &amp; playback</h2>
+    <label for="recordSource">Record audio from</label>
+    <select id="recordSource"><option value="output">Output · after effects and gain</option><option value="input">Input · raw capture before routing and effects</option></select>
+    <label for="playbackMode">Play WAV files</label>
+    <select id="playbackMode"><option value="direct">Direct · original audio</option><option value="effects">Through effects · current sound shaping</option></select>
+    <label for="recordDirectory">Recording directory on Raspberry Pi</label>
+    <input id="recordDirectory" type="text" required autocomplete="off" spellcheck="false" aria-describedby="directoryHelp">
+    <small id="directoryHelp">WAV files are saved and listed here. Relative paths start at the project folder. Missing folders are created when you save.</small>
+    <div class="directory-actions"><button id="browseDirectory" type="button">Browse folders…</button></div>
+    <div id="directoryBrowser" hidden><small id="directoryLocation"></small><div id="directoryEntries"></div><div class="directory-actions"><button id="directoryUp" type="button">Up one folder</button></div></div>
+    <p>Saved changes apply to the next recording or playback. An active session keeps its original settings. Settings reset when the audio program restarts.</p>
+    <p id="settingsError" role="alert"></p>
+    <div class="dialog-actions"><button id="cancelSettings" type="button">Cancel</button><button id="saveSettings" type="submit">Save settings</button></div>
+  </form>
+</dialog>
 <section class="console">
   <div class="top-row">
   <div class="card controls-card">
@@ -203,10 +222,16 @@ footer{color:var(--muted);font-size:.82rem;margin-top:18px;text-align:center}
 <script>
 const $=id=>document.getElementById(id);
 let media={recording:false,playing:false},mediaPending=false,mediaActionError="";
-function showMedia(s){media=s;$('record').textContent=s.recording?'Stop':'Record';$('record').disabled=mediaPending||s.playing;$('play').disabled=mediaPending||s.recording||s.playing||!$('wavFiles').value;$('wavFiles').disabled=mediaPending||s.recording||s.playing;$('mediaStatus').textContent=mediaActionError||s.mediaError||(s.recording?'Recording '+s.mediaFile:s.playing?'Playing '+s.mediaFile:'Ready · WAV playback mixes with live input')}
+function showMedia(s){media=s;const label=s.recording?'Stop recording':'Start recording';$('record').innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24">'+(s.recording?'<rect x="5" y="5" width="14" height="14" rx="2"/>':'<circle cx="12" cy="12" r="7"/>')+'</svg>';$('record').title=label;$('record').setAttribute('aria-label',label);$('record').setAttribute('aria-pressed',String(!!s.recording));$('record').disabled=mediaPending||s.playing;$('play').disabled=mediaPending||s.recording||s.playing||!$('wavFiles').value;$('wavFiles').disabled=mediaPending||s.recording||s.playing;$('mediaStatus').textContent=mediaActionError||s.mediaError||(s.recording?'Recording '+(s.activeRecordInput?'input':'output')+' · '+s.mediaFile:s.playing?'Playing '+(s.activePlaybackEffects?'through effects':'direct')+' · '+s.mediaFile:'Ready · WAV playback mixes with live input')}
 async function loadFiles(){try{const r=await fetch('/api/files');if(!r.ok)throw Error('Cannot list WAV files');const names=await r.json(),selected=$('wavFiles').value;$('wavFiles').replaceChildren(...names.map(name=>new Option(name,name)));if(names.includes(selected))$('wavFiles').value=selected;showMedia(media)}catch(e){$('mediaStatus').textContent=e.message}}
 async function transport(action){mediaActionError="";mediaPending=true;showMedia(media);try{const q=new URLSearchParams({action,file:$('wavFiles').value}),r=await fetch('/api/transport?'+q),s=await r.json();if(!r.ok)throw Error(s.error);mediaPending=false;showMedia(s);await loadFiles()}catch(e){mediaPending=false;mediaActionError=e.message;showMedia(media)}}
 $('record').onclick=()=>transport(media.recording?'stop':'record');$('play').onclick=()=>transport('play');$('wavFiles').onchange=()=>showMedia(media);
+let directoryParent='';
+$('settingsButton').onclick=async()=>{const dialog=$('settingsDialog');$('settingsError').textContent='';$('directoryBrowser').hidden=true;$('saveSettings').disabled=true;dialog.showModal();try{const r=await fetch('/api/settings');const s=await r.json();if(!r.ok)throw Error(s.error||'Cannot load settings');$('recordSource').value=s.settings.recordSource;$('playbackMode').value=s.settings.playbackMode;$('recordDirectory').value=s.settings.directory;$('saveSettings').disabled=false}catch(e){$('settingsError').textContent=e.message}};
+$('cancelSettings').onclick=()=>$('settingsDialog').close();
+async function browseDirectory(path){$('settingsError').textContent='';try{const r=await fetch('/api/directories?'+new URLSearchParams({path})),s=await r.json();if(!r.ok)throw Error(s.error);directoryParent=s.parent;$('recordDirectory').value=s.directory;$('directoryLocation').textContent=s.directory;$('directoryBrowser').hidden=false;$('directoryUp').disabled=!s.parent||s.parent===s.directory;const entries=s.children.map(name=>{const button=document.createElement('button');button.type='button';button.textContent=name;button.onclick=()=>browseDirectory(s.directory+'/'+name);return button});if(!entries.length){const empty=document.createElement('small');empty.textContent='No subfolders';entries.push(empty)}$('directoryEntries').replaceChildren(...entries)}catch(e){$('settingsError').textContent=e.message}}
+$('browseDirectory').onclick=()=>browseDirectory($('recordDirectory').value);$('directoryUp').onclick=()=>browseDirectory(directoryParent);
+$('settingsForm').onsubmit=async event=>{event.preventDefault();$('saveSettings').disabled=true;$('settingsError').textContent='';try{const q=new URLSearchParams({recordSource:$('recordSource').value,playbackMode:$('playbackMode').value,directory:$('recordDirectory').value}),r=await fetch('/api/settings?'+q),s=await r.json();if(!r.ok)throw Error(s.error);mediaActionError='';showMedia(s);await loadFiles();$('settingsDialog').close()}catch(e){$('settingsError').textContent=e.message}finally{$('saveSettings').disabled=false}};
 	const gain=$('gain'),dryWet=$('dryWet'),noise=$('noise'),eqGains=[0,1,2,3,4,5,6].map(i=>$('eq'+i)),compThreshold=$('compThreshold'),compRatio=$('compRatio'),compAttack=$('compAttack'),compRelease=$('compRelease'),compMakeup=$('compMakeup'),routing=$('routing'),status=$('status'),peakBar=$('peakBar'),peakValue=$('peakValue');
 let timer;
 	function labels(){$('gainValue').textContent=(+gain.value).toFixed(1)+' dB';$('dryWetValue').textContent=Math.round(+dryWet.value)+'% wet';$('noiseValue').textContent=+noise.value===0?'Off':Math.round(+noise.value)+'%';eqGains.forEach((control,i)=>$('eq'+i+'Value').textContent=(+control.value).toFixed(1)+' dB');$('compThresholdValue').textContent=(+compThreshold.value).toFixed(1)+' dB';$('compRatioValue').textContent=(+compRatio.value).toFixed(1)+':1';$('compAttackValue').textContent=(+compAttack.value).toFixed(1)+' ms';$('compReleaseValue').textContent=Math.round(+compRelease.value)+' ms';$('compMakeupValue').textContent=(+compMakeup.value).toFixed(1)+' dB'}
@@ -252,6 +277,12 @@ std::string WebControlServer::state_json() const {
          << ",\"playing\":" << (media.playing ? "true" : "false")
          << ",\"mediaFile\":" << json_string(media.file)
          << ",\"mediaError\":" << json_string(media.error)
+         << ",\"activeRecordInput\":" << (media.activeRecordInput ? "true" : "false")
+         << ",\"activePlaybackEffects\":" << (media.activePlaybackEffects ? "true" : "false")
+         << ",\"activeDirectory\":" << json_string(media.activeDirectory)
+         << ",\"settings\":{\"recordSource\":" << json_string(media.settings.recordInput ? "input" : "output")
+         << ",\"playbackMode\":" << json_string(media.settings.playbackEffects ? "effects" : "direct")
+         << ",\"directory\":" << json_string(media.settings.directory.string()) << '}'
          << ",\"gainDb\":" << gainDb << ",\"eqGains\":[";
     for(size_t band = 0; band < Processor::EqBandCount; ++band) {
         if(band > 0) json << ',';
@@ -390,6 +421,31 @@ void WebControlServer::handle(int client) {
         send_response(client, "200 OK", "text/html; charset=utf-8", page());
     } else if(target == "/api/state") {
         send_response(client, "200 OK", "application/json", state_json());
+    } else if(target == "/api/settings" || target.rfind("/api/settings?", 0) == 0 || target.rfind("/api/directories?", 0) == 0) {
+        try {
+            if(target.rfind("/api/directories?", 0) == 0) {
+                const auto parameters = query_parameters(target);
+                const auto directories = transport_.directories(parameters.at("path"));
+                std::string body = "{\"directory\":"+json_string(directories.directory)+",\"parent\":"+json_string(directories.parent)+",\"children\":[";
+                bool first=true;
+                for(const auto& child : directories.children) {
+                    if(!first) body+=',';
+                    first=false; body+=json_string(child);
+                }
+                send_response(client,"200 OK","application/json",body+"]}");
+            } else {
+                if(target != "/api/settings") {
+                    const auto parameters = query_parameters(target);
+                    const auto source = parameters.at("recordSource"), mode = parameters.at("playbackMode");
+                    if((source!="input" && source!="output") || (mode!="direct" && mode!="effects"))
+                        throw std::runtime_error("Invalid recording source or playback mode");
+                    transport_.set_settings({source=="input",mode=="effects",parameters.at("directory")});
+                }
+                send_response(client,"200 OK","application/json",state_json());
+            }
+        } catch(const std::exception& error) {
+            send_response(client,"400 Bad Request","application/json","{\"error\":"+json_string(error.what())+"}");
+        }
     } else if(target == "/api/files" || target.rfind("/api/transport?", 0) == 0) {
         try {
             if(target == "/api/files") {

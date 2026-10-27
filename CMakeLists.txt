@@ -53,6 +53,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_compile_definitions(realtime_audio PRIVATE DEFAULT_DATA_DIR="${CMAKE_SOURCE_DIR}/data")
     target_compile_options(realtime_audio PRIVATE -Wall -Wextra -Wpedantic)
 
+    if(BUILD_TESTING)
+        add_executable(audio_pipeline_test
+            tests/audio_pipeline_test.cpp
+            src/audio_transport.cpp
+            src/audio_config.cpp
+            src/realtime_processor.cpp
+            src/deepfilter_processor.cpp
+        )
+        target_link_libraries(audio_pipeline_test PRIVATE PkgConfig::ALSA Threads::Threads ${CMAKE_DL_LIBS})
+        target_compile_options(audio_pipeline_test PRIVATE -Wall -Wextra -Wpedantic)
+        add_test(NAME audio_pipeline COMMAND audio_pipeline_test)
+    endif()
+
     add_executable(mcp3008_test
         src/mcp3008.cpp
         src/mcp3008_test.cpp

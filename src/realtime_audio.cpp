@@ -18,6 +18,7 @@
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include <algorithm>
 
 namespace {
 std::atomic<bool> running{true};
@@ -91,6 +92,7 @@ int main(int argc, char** argv) {
         AudioTransport transport(options.rate, options.channels, DEFAULT_DATA_DIR);
         WebControlServer webControls(options.webPort, processor, transport);
         std::vector<int16_t> samples(options.periodFrames * options.channels);
+        std::vector<int16_t> rawInput(samples.size()), effectsPlayback(samples.size()), directPlayback(samples.size());
         RecoveryStats recoveries;
 
         std::cout << "Streaming " << options.rate << " Hz, " << options.channels
@@ -133,8 +135,13 @@ int main(int argc, char** argv) {
                 continue;
             }
 
-            processor.process(samples, frames);
-            transport.process(samples.data(), static_cast<size_t>(frames));
+            const size_t count = static_cast<size_t>(frames)*options.channels;
+            std::copy_n(samples.data(), count, rawInput.data());
+            transport.render_playback(effectsPlayback.data(),directPlayback.data(),static_cast<size_t>(frames));
+            processor.process(samples, frames, effectsPlayback.data());
+            for(size_t i=0; i<count; ++i)
+                samples[i] = static_cast<int16_t>(std::clamp(int(samples[i])+int(directPlayback[i]),-32768,32767));
+            transport.capture_recording(rawInput.data(),samples.data(),static_cast<size_t>(frames));
             snd_pcm_sframes_t written = 0;
             while(written < frames && running) {
                 const auto result = snd_pcm_writei(

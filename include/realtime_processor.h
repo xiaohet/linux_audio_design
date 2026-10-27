@@ -67,7 +67,8 @@ public:
     explicit Processor(const Options& options);
     ~Processor();
 
-    void process(std::vector<int16_t>& samples, snd_pcm_sframes_t frames);
+    void process(std::vector<int16_t>& samples, snd_pcm_sframes_t frames,
+                 const int16_t* effectsPlayback = nullptr);
     void set_gain(float value);
     void set_gain_db(float value);
     void set_routing(Routing value);

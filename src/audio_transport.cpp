@@ -38,13 +38,16 @@ bool wav(const std::filesystem::path& p) {
 struct AudioTransport::Recording {
     std::ofstream file;
     std::string name;
+    bool input;
+    std::string directory;
     std::vector<int16_t> ring;
     std::atomic<size_t> read{0}, write{0};
     std::atomic<bool> stopping{false}, failed{false};
     std::thread worker;
     unsigned rate, channels;
-    Recording(const std::filesystem::path& path, unsigned r, unsigned c)
+    Recording(const std::filesystem::path& path, unsigned r, unsigned c, bool recordInput)
         : file(path, std::ios::binary), name(path.filename().string()),
+          input(recordInput), directory(path.parent_path().string()),
           ring(size_t(r)*c*4), rate(r), channels(c) {
         if(!file) throw std::runtime_error("Cannot create recording: " + path.string());
         header(file,rate,channels,0);
@@ -79,17 +82,22 @@ struct AudioTransport::Playback {
     std::vector<float> samples;
     unsigned rate = 0, channels = 0;
     double position = 0;
+    bool effects = false;
+    std::string directory;
 };
 
 AudioTransport::AudioTransport(unsigned rate, unsigned channels, std::filesystem::path dir)
-    : rate_(rate), channels_(channels), directory_(std::move(dir)) {
-    std::filesystem::create_directories(directory_);
+    : rate_(rate), channels_(channels), settings_{false, false, std::filesystem::absolute(dir).lexically_normal()},
+      projectDirectory_(settings_.directory.parent_path()) {
+    std::filesystem::create_directories(settings_.directory);
 }
 AudioTransport::~AudioTransport() { try { stop_recording(); } catch(...) {} }
 
 std::vector<std::string> AudioTransport::files() const {
+    std::filesystem::path directory;
+    { std::lock_guard<std::mutex> lock(mutex_); directory = settings_.directory; }
     std::vector<std::string> names;
-    for(const auto& entry : std::filesystem::directory_iterator(directory_))
+    for(const auto& entry : std::filesystem::directory_iterator(directory))
         if(entry.is_regular_file() && !entry.is_symlink() && wav(entry.path()))
             names.push_back(entry.path().filename().string());
     std::sort(names.begin(), names.end());
@@ -101,14 +109,16 @@ std::string AudioTransport::record() {
       if(recording_ || (playback_ && playback_->position < playback_->samples.size()/playback_->channels))
           throw std::runtime_error("Recording/playback is already active"); }
     std::filesystem::path path;
+    Settings settings;
+    { std::lock_guard<std::mutex> lock(mutex_); settings = settings_; }
     for(unsigned i = 0; i < 10000; ++i) {
         std::ostringstream name; name << "record" << std::setw(4) << std::setfill('0') << i << ".wav";
-        path = directory_/name.str();
+        path = settings.directory/name.str();
         if(!std::filesystem::exists(path) && !std::filesystem::is_symlink(path)) break;
         path.clear();
     }
     if(path.empty()) throw std::runtime_error("All record0000..record9999 names are occupied");
-    auto session = std::make_unique<Recording>(path,rate_,channels_);
+    auto session = std::make_unique<Recording>(path,rate_,channels_,settings.recordInput);
     std::lock_guard<std::mutex> lock(mutex_);
     lastFile_ = session->name; error_.clear(); recording_ = std::move(session);
     return lastFile_;
@@ -135,7 +145,35 @@ void AudioTransport::stop_playback() {
 AudioTransport::State AudioTransport::state() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return {bool(recording_), playback_ && playback_->position < playback_->samples.size()/playback_->channels,
-            lastFile_, recording_ && recording_->failed ? "Recording writer failed; stop recording to finalize the file" : error_};
+            lastFile_, recording_ && recording_->failed ? "Recording writer failed; stop recording to finalize the file" : error_,
+            settings_, recording_ && recording_->input, playback_ && playback_->effects,
+            recording_ ? recording_->directory : playback_ ? playback_->directory : std::string{}};
+}
+void AudioTransport::set_settings(const Settings& settings) {
+    std::lock_guard<std::mutex> command(commands_);
+    if(settings.directory.empty() || settings.directory.string().find('\0') != std::string::npos)
+        throw std::runtime_error("Enter a recording directory on the Raspberry Pi");
+    Settings next = settings;
+    next.directory = std::filesystem::absolute(settings.directory.is_absolute()
+        ? settings.directory : projectDirectory_/settings.directory).lexically_normal();
+    std::filesystem::create_directories(next.directory);
+    if(!std::filesystem::is_directory(next.directory)) throw std::runtime_error("Not a directory");
+    // Directory creation/validation occurs outside the audio-thread lock.
+    std::lock_guard<std::mutex> lock(mutex_);
+    settings_ = std::move(next);
+}
+AudioTransport::Directories AudioTransport::directories(const std::string& path) const {
+    std::filesystem::path directory(path);
+    if(path.empty()) { std::lock_guard<std::mutex> lock(mutex_); directory = settings_.directory; }
+    else if(directory.is_relative()) directory = projectDirectory_/directory;
+    directory = std::filesystem::canonical(directory);
+    Directories result{directory.string(), directory.parent_path().string(), {}};
+    for(const auto& entry : std::filesystem::directory_iterator(directory, std::filesystem::directory_options::skip_permission_denied)) {
+        std::error_code error;
+        if(entry.is_directory(error)) result.children.push_back(entry.path().filename().string());
+    }
+    std::sort(result.children.begin(),result.children.end());
+    return result;
 }
 void AudioTransport::play(const std::string& name) {
     std::lock_guard<std::mutex> command(commands_);
@@ -143,15 +181,18 @@ void AudioTransport::play(const std::string& name) {
       if(recording_ || (playback_ && playback_->position < playback_->samples.size()/playback_->channels))
           throw std::runtime_error("Recording/playback is already active"); }
     const std::filesystem::path relative(name);
-    const auto path = directory_/relative;
+    Settings settings;
+    { std::lock_guard<std::mutex> lock(mutex_); settings = settings_; }
+    const auto path = settings.directory/relative;
     if(name.empty() || relative != relative.filename() || !wav(relative) ||
        std::filesystem::is_symlink(path) || !std::filesystem::is_regular_file(path))
-        throw std::runtime_error("Select a WAV filename from the data directory");
+        throw std::runtime_error("Select a WAV filename from the configured recording directory");
     std::ifstream f(path,std::ios::binary);
     unsigned char h[12];
     if(!f.read(reinterpret_cast<char*>(h),12) || std::memcmp(h,"RIFF",4) || std::memcmp(h+8,"WAVE",4))
         throw std::runtime_error("Invalid RIFF WAV file");
     auto next = std::make_unique<Playback>(); next->name = name;
+    next->effects = settings.playbackEffects; next->directory = settings.directory.string();
     unsigned format = 0, bits = 0, align = 0;
     std::streampos dataAt{}; uint32_t dataSize = 0;
     while(f.read(reinterpret_cast<char*>(h),8)) {
@@ -194,10 +235,13 @@ void AudioTransport::play(const std::string& name) {
     { std::lock_guard<std::mutex> lock(mutex_);
       old=std::move(playback_); playback_=std::move(next); lastFile_=name; error_.clear(); }
 }
-void AudioTransport::process(int16_t* output, size_t frames) {
+void AudioTransport::render_playback(int16_t* effects, int16_t* direct, size_t frames) {
+    std::fill_n(effects, frames*channels_, 0);
+    std::fill_n(direct, frames*channels_, 0);
     std::lock_guard<std::mutex> lock(mutex_);
     if(playback_) {
         auto& p=*playback_; const size_t length=p.samples.size()/p.channels;
+        int16_t* output = p.effects ? effects : direct;
         for(size_t i=0; i<frames && p.position<length; ++i,p.position+=double(p.rate)/rate_) {
             const size_t a=static_cast<size_t>(p.position), b=std::min(a+1,length-1);
             const float fraction=static_cast<float>(p.position-a);
@@ -206,15 +250,18 @@ void AudioTransport::process(int16_t* output, size_t frames) {
                 float sample=p.samples[a*p.channels+source]*(1-fraction)+p.samples[b*p.channels+source]*fraction;
                 if(channels_==1 && p.channels==2)
                     sample=(sample+p.samples[a*2+1]*(1-fraction)+p.samples[b*2+1]*fraction)*0.5f;
-                const float mixed=output[i*channels_+ch]+sample*32768.0f;
-                output[i*channels_+ch]=static_cast<int16_t>(std::clamp(mixed,-32768.0f,32767.0f));
+                output[i*channels_+ch]=static_cast<int16_t>(std::clamp(sample*32768.0f,-32768.0f,32767.0f));
             }
         }
     }
+}
+void AudioTransport::capture_recording(const int16_t* input, const int16_t* output, size_t frames) {
+    std::lock_guard<std::mutex> lock(mutex_);
     if(recording_ && !recording_->failed) {
         auto& r=*recording_; const size_t end=r.write.load(), count=frames*channels_;
+        const int16_t* source = r.input ? input : output;
         if(count > r.ring.size()-(end-r.read.load())) { r.failed=true; return; }
-        for(size_t i=0;i<count;++i) r.ring[(end+i)%r.ring.size()]=output[i];
+        for(size_t i=0;i<count;++i) r.ring[(end+i)%r.ring.size()]=source[i];
         r.write.store(end+count);
     }
 }
